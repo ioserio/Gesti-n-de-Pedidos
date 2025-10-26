@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Resumen de Pedidos por Vendedor</title>
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Resumen de Pedidos por Vendedor (Hoy)</h2>
+        <div style="margin-bottom:12px;">
+            <label for="filtroSupervisor"><b>Supervisor:</b></label>
+            <select id="filtroSupervisor">
+                <option value="">Todos</option>
+                <option value="JOSE">JOSE</option>
+                <option value="CARLOS">CARLOS</option>
+                <option value="JESUS">JESUS</option>
+                <option value="FRANCISCO">FRANCISCO</option>
+                <option value="OFICINA">OFICINA</option>
+            </select>
+        </div>
+        <div id="resumen"></div>
+    </div>
+    <script>
+    // Cargar el resumen vía AJAX con filtro de supervisor
+    function cargarResumen() {
+        const supervisor = document.getElementById('filtroSupervisor').value;
+        let url = 'resumen_pedidos.php';
+        if (supervisor) {
+            url += '?supervisor=' + encodeURIComponent(supervisor);
+        }
+        fetch(url)
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('resumen').innerHTML = html;
+            });
+    }
+
+    window.onload = function() {
+        document.getElementById('filtroSupervisor').addEventListener('change', cargarResumen);
+        cargarResumen();
+    };
+    </script>
+</body>
+</html>

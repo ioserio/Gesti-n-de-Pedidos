@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gestión de Pedidos</title>
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <ul class="menu">
+                <li><a href="#" onclick="mostrarModulo('subir')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l4 4h-3v6h-2V7H8l4-4z"/><path d="M4 14h16v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/></svg></span>Subir Pedidos</a></li>
+                <li><a href="#" onclick="mostrarModulo('consultar')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"/></svg></span>Consultar por Vendedor</a></li>
+                <li><a href="#" onclick="mostrarModulo('resumen')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="10" width="4" height="10" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span>Resumen de Pedidos</a></li>
+                <li><a href="#" onclick="mostrarModulo('admin')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19.14 12.94a7.46 7.46 0 000-1.88l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.6-.22l-2.39.96a7.52 7.52 0 00-1.63-.95L14.5 1.9a.5.5 0 00-.49-.4h-3.99a.5.5 0 00-.49.4l-.36 2.41c-.57.23-1.11.54-1.63.95l-2.39-.96a.5.5 0 00-.6.22L2.64 8.35a.5.5 0 00.12.64l2.03 1.58c-.05.31-.08.63-.08.94s.03.63.08.94L2.76 14.03a.5.5 0 00-.12.64l1.92 3.32c.14.24.44.34.7.22l2.39-.96c.51.41 1.06.73 1.63.95l.36 2.41c.06.24.26.4.49.4h3.99c.23 0 .43-.16.49-.4l.36-2.41c.57-.23 1.11-.54 1.63-.95l2.39.96c.26.11.56.01.7-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1112 8a3.5 3.5 0 010 7.5z"/></svg></span>Administrador</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div class="container">
+    <section id="modulo-subir">
+        <h2>Subir archivo Excel de Pedidos</h2>
+        <form action="procesar_excel.php" method="post" enctype="multipart/form-data">
+            <input type="file" name="archivo_excel" accept=".xlsx,.xls" required>
+            <button type="submit">Subir</button>
+        </form>
+        <div id="preview"></div>
+    </section>
+    <section id="modulo-consultar" style="display:none;">
+        <h2>Consultar Pedidos por Vendedor</h2>
+        <form id="form-consultar">
+            <label for="cod_vendedor">Código de Vendedor:</label>
+            <input type="text" id="cod_vendedor" name="cod_vendedor" required>
+            <button type="submit">Consultar</button>
+        </form>
+        <div id="resultados"></div>
+    </section>
+    <section id="modulo-resumen" style="display:none;">
+        <h2>Resumen de Pedidos por Vendedor</h2>
+        <form id="form-resumen" style="margin-bottom:20px;">
+            <label for="fecha_resumen">Fecha:</label>
+            <input type="date" id="fecha_resumen" name="fecha_resumen" value="" required>
+            <label for="supervisor_resumen" style="margin-left:15px;"><b>Supervisor:</b></label>
+            <select id="supervisor_resumen" name="supervisor_resumen">
+                <option value="">Todos</option>
+                <option value="JOSE">JOSE</option>
+                <option value="CARLOS">CARLOS</option>
+                <option value="JESUS">JESUS</option>
+                <option value="FRANCISCO">FRANCISCO</option>
+                <option value="OFICINA">OFICINA</option>
+            </select>
+            <button type="submit">Consultar</button>
+        </form>
+        <div id="resumen"></div>
+    </section>
+    <section id="modulo-admin" style="display:none;">
+        <h2>Administrador de Cuotas</h2>
+        <form id="form-cuota" style="margin-bottom:15px;">
+            <label for="cuota_vd">Cod Vendedor:</label>
+            <input type="text" id="cuota_vd" name="cod_vendedor" placeholder="Ej: 021" required style="width:90px;">
+            <label for="cuota_dia" style="margin-left:10px;">Día:</label>
+            <select id="cuota_dia" name="dia_semana">
+                <option value="1">Lunes</option>
+                <option value="2">Martes</option>
+                <option value="3">Miércoles</option>
+                <option value="4">Jueves</option>
+                <option value="5">Viernes</option>
+                <option value="6">Sábado</option>
+                <option value="7">Domingo</option>
+            </select>
+            <label for="cuota_monto" style="margin-left:10px;">Cuota S/</label>
+            <input type="number" id="cuota_monto" name="cuota" step="0.01" min="0" required style="width:120px;">
+            <button type="submit">Guardar Cuota</button>
+        </form>
+        <div id="lista-cuotas"></div>
+    </section>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

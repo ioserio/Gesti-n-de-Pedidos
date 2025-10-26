@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Consulta Pedidos por Vendedor</title>
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Consultar Pedidos por Vendedor</h2>
+        <form action="consultar_pedidos.php" method="get">
+            <label for="cod_vendedor">Código de Vendedor:</label>
+            <input type="text" id="cod_vendedor" name="cod_vendedor" required>
+            <button type="submit">Consultar</button>
+        </form>
+        <div id="resultados"></div>
+    </div>
+</body>
+</html>
