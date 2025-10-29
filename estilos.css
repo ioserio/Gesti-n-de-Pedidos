@@ -116,6 +116,21 @@
     }
     button { width: 100%; margin-top: 8px; }
 }
+
+/* Extra compacto para móviles muy pequeños */
+@media (max-width: 480px) {
+    nav { padding: 0 6px; }
+    .menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; justify-items: center; }
+    .menu li { margin: 0; }
+    .menu a { padding: 10px 6px; font-size: 13px; }
+    .container { padding: 8px 6px 12px 6px; }
+    h2 { font-size: 17px; }
+    table { font-size: 12px; }
+    th, td { padding: 6px; }
+    /* Mantener barra y % en línea sin romper */
+    .avance-cell { white-space: nowrap; }
+    td .progress { width: 110px; }
+}
 @media print {
     body * {
         visibility: hidden !important;
