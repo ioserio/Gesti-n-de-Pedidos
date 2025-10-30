@@ -13,6 +13,7 @@
                 <li><a href="#" onclick="mostrarModulo('subir')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l4 4h-3v6h-2V7H8l4-4z"/><path d="M4 14h16v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/></svg></span>Subir Pedidos</a></li>
                 <li><a href="#" onclick="mostrarModulo('consultar')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"/></svg></span>Consultar por Vendedor</a></li>
                 <li><a href="#" onclick="mostrarModulo('resumen')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="10" width="4" height="10" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span>Resumen de Pedidos</a></li>
+                <li><a href="#" onclick="mostrarModulo('devoluciones')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v4H7l5 5 5-5h-5V5z"/><path d="M5 19h14v-2H5v2z"/></svg></span>Gestión de Devoluciones</a></li>
                 <li><a href="#" onclick="mostrarModulo('admin')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19.14 12.94a7.46 7.46 0 000-1.88l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.6-.22l-2.39.96a7.52 7.52 0 00-1.63-.95L14.5 1.9a.5.5 0 00-.49-.4h-3.99a.5.5 0 00-.49.4l-.36 2.41c-.57.23-1.11.54-1.63.95l-2.39-.96a.5.5 0 00-.6.22L2.64 8.35a.5.5 0 00.12.64l2.03 1.58c-.05.31-.08.63-.08.94s.03.63.08.94L2.76 14.03a.5.5 0 00-.12.64l1.92 3.32c.14.24.44.34.7.22l2.39-.96c.51.41 1.06.73 1.63.95l.36 2.41c.06.24.26.4.49.4h3.99c.23 0 .43-.16.49-.4l.36-2.41c.57-.23 1.11-.54 1.63-.95l2.39.96c.26.11.56.01.7-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1112 8a3.5 3.5 0 010 7.5z"/></svg></span>Administrador</a></li>
             </ul>
         </nav>
@@ -25,6 +26,23 @@
             <button type="submit">Subir</button>
         </form>
         <div id="preview"></div>
+
+        <hr style="margin:24px 0;">
+
+        <h2>Subir Excel de Devoluciones por Cliente</h2>
+        <p>Selecciona tu archivo <b>DEVOLUCIONES POR CLIENTE.xlsx</b> para cargarlo en la tabla <code>devoluciones_por_cliente</code>.</p>
+        <form action="procesar_devoluciones.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
+            <input type="file" name="archivo_devoluciones" accept=".xlsx,.xls" required>
+            <label style="margin-left:14px;">
+                Fecha:
+                <input type="date" name="fecha_devoluciones" required>
+            </label>
+            <label style="margin-left:14px;">
+                <input type="checkbox" name="replace_all" value="1" checked>
+                Reemplazar registros de esa fecha
+            </label>
+            <button type="submit" style="margin-left:14px;">Subir Devoluciones</button>
+        </form>
     </section>
     <section id="modulo-consultar" style="display:none;">
         <h2>Consultar Pedidos por Vendedor</h2>
@@ -73,6 +91,21 @@
             <button type="submit">Guardar Cuota</button>
         </form>
         <div id="lista-cuotas"></div>
+    </section>
+    <section id="modulo-devoluciones" style="display:none;">
+        <h2>Gestión de Devoluciones</h2>
+        <form id="form-devoluciones" style="margin-bottom:15px;">
+            <label for="fecha_dev">Fecha:</label>
+            <input type="date" id="fecha_dev" name="fecha" required>
+            <label for="dev_cod_vend" style="margin-left:10px;">Vendedor:</label>
+            <input type="text" id="dev_cod_vend" name="cod_vendedor" placeholder="Ej: 021" style="width:90px;">
+            <label for="dev_cod_cli" style="margin-left:10px;">Cliente:</label>
+            <input type="text" id="dev_cod_cli" name="cod_cliente" placeholder="Código" style="width:120px;">
+            <label for="dev_veh" style="margin-left:10px;">Vehículo:</label>
+            <input type="text" id="dev_veh" name="vehiculo" placeholder="Placa" style="width:120px;">
+            <button type="submit" style="margin-left:10px;">Consultar</button>
+        </form>
+        <div id="devoluciones"></div>
     </section>
     </div>
     <script src="script.js"></script>

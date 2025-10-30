@@ -207,6 +207,14 @@ h2 {
 /* Iconos en menú principal */
 .menu a .nav-icon { display:inline-flex; width:16px; height:16px; margin-right:8px; vertical-align:middle; }
 .menu a .nav-icon svg { width:16px; height:16px; fill:#fff; stroke:#fff; }
+/* Gestión de Devoluciones */
+.bloque-vehiculo { border:1px solid #e3e3e3; border-radius:6px; padding:12px; margin:16px 0; background:#fafafa; }
+.bloque-vehiculo h3 { margin:0 0 10px 0; }
+.estado-selects { display:flex; flex-wrap:wrap; gap:6px; }
+.estado-resumen { margin-bottom:6px; color:#333; font-size:14px; }
+.estado-select { min-width:160px; padding:4px; }
+.msg-ok { background:#e8f8ec; border:1px solid #bfe6c9; color:#2f7d3b; padding:8px 10px; border-radius:6px; margin:8px 0; }
+.msg-err { background:#fdecea; border:1px solid #f5c2c0; color:#842029; padding:8px 10px; border-radius:6px; margin:8px 0; }
 input[type="file"] {
     margin-bottom: 15px;
 }

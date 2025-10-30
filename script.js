@@ -10,6 +10,18 @@ function setFechaHoyResumen() {
     }
 }
 
+    // Función para poner la fecha de hoy en el input de devoluciones
+    function setFechaHoyDevoluciones() {
+        const fechaInput = document.getElementById('fecha_dev');
+        if (fechaInput) {
+            const hoy = new Date();
+            const yyyy = hoy.getFullYear();
+            const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+            const dd = String(hoy.getDate()).padStart(2, '0');
+            fechaInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+    }
+
 // Mostrar módulo y cargar resumen automáticamente
 window.mostrarModulo = function(modulo) {
     document.getElementById('modulo-subir').style.display = (modulo === 'subir') ? 'block' : 'none';
@@ -17,6 +29,8 @@ window.mostrarModulo = function(modulo) {
     document.getElementById('modulo-resumen').style.display = (modulo === 'resumen') ? 'block' : 'none';
     const admin = document.getElementById('modulo-admin');
     if (admin) admin.style.display = (modulo === 'admin') ? 'block' : 'none';
+        const devol = document.getElementById('modulo-devoluciones');
+        if (devol) devol.style.display = (modulo === 'devoluciones') ? 'block' : 'none';
     if (modulo === 'resumen') {
         // Esperar a que el DOM renderice el input de fecha
         setTimeout(function() {
@@ -29,6 +43,12 @@ window.mostrarModulo = function(modulo) {
     } else if (modulo === 'admin') {
         // Cargar lista de cuotas
         setTimeout(function(){ cargarCuotas(); }, 50);
+        } else if (modulo === 'devoluciones') {
+            setTimeout(function(){
+                setFechaHoyDevoluciones();
+                const f = document.getElementById('fecha_dev');
+                if (f) cargarDevoluciones();
+            }, 100);
     }
 }
 
@@ -98,6 +118,61 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(r=>r.text())
                     .then(html => { this.innerHTML = html; })
                     .catch(()=>alert('Error al eliminar cuota'));
+            }
+        });
+    }
+});
+
+// Devoluciones: cargar listado
+function cargarDevoluciones(){
+    const cont = document.getElementById('devoluciones');
+    if (!cont) return;
+    const fecha = document.getElementById('fecha_dev')?.value || '';
+    const codVend = document.getElementById('dev_cod_vend')?.value || '';
+    const codCli = document.getElementById('dev_cod_cli')?.value || '';
+    const veh = document.getElementById('dev_veh')?.value || '';
+    cont.innerHTML = '<p>Cargando...</p>';
+    const params = new URLSearchParams();
+    if (fecha) params.append('fecha', fecha);
+    if (codVend) params.append('cod_vendedor', codVend);
+    if (codCli) params.append('cod_cliente', codCli);
+    if (veh) params.append('vehiculo', veh);
+    fetch('devoluciones_gestion.php?' + params.toString())
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(() => { cont.innerHTML = '<p>Error al consultar devoluciones.</p>'; });
+}
+
+// Listener formulario devoluciones
+document.addEventListener('DOMContentLoaded', function(){
+    const formDev = document.getElementById('form-devoluciones');
+    if (formDev) {
+        formDev.addEventListener('submit', function(e){
+            e.preventDefault();
+            cargarDevoluciones();
+        });
+    }
+    // Delegación para guardar formularios por camión
+    const cont = document.getElementById('devoluciones');
+    if (cont) {
+        cont.addEventListener('submit', function(e){
+            const formEstados = e.target.closest('form.form-estados');
+            const formBulk = e.target.closest('form.form-bulk');
+            if (formEstados || formBulk) {
+                e.preventDefault();
+                const form = formEstados || formBulk;
+                const fd = new FormData(form);
+                fetch('devoluciones_gestion.php', { method:'POST', body: fd })
+                    .then(r => r.text())
+                    .then(msg => {
+                        // Mostrar mensaje y refrescar listado para actualizar conteos/restantes
+                        const box = document.createElement('div');
+                        box.innerHTML = msg;
+                        form.insertAdjacentElement('beforebegin', box.firstChild);
+                        // Pequeño retraso para ver el mensaje y refrescar
+                        setTimeout(() => cargarDevoluciones(), 300);
+                    })
+                    .catch(()=>alert('Error al guardar estados'));
             }
         });
     }
