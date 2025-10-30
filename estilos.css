@@ -180,6 +180,7 @@ nav {
 }
 .menu li {
     margin: 6px 10px;
+    position: relative;
 }
 .menu a {
     color: #fff;
@@ -192,6 +193,24 @@ nav {
 .menu a:hover {
     text-decoration: underline;
 }
+/* Submenu for Gestión de Devoluciones */
+.menu .submenu {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 100%;
+    background: #ffffff;
+    color: #333;
+    min-width: 220px;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+    padding: 6px 0;
+    z-index: 50;
+}
+.menu li.has-submenu:hover > .submenu { display: block; }
+.menu .submenu li { margin: 0; }
+.menu .submenu a { color: #333; padding: 8px 12px; display: block; }
+.menu .submenu a:hover { background: #f1f5ff; text-decoration: none; }
 .container {
     max-width: 1100px;
     margin: 40px auto;

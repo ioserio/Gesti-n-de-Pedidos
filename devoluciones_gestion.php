@@ -9,6 +9,13 @@ require_once __DIR__ . '/conexion.php';
 
 function esc($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
+// Detectar si la solicitud espera JSON (AJAX)
+function wants_json(): bool {
+    $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+    $acceptsJson = isset($_SERVER['HTTP_ACCEPT']) && stripos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
+    return $isAjax || $acceptsJson;
+}
+
 // Asegurar tabla de estados por unidad usando el esquema solicitado (con FK y ENUM)
 $createEstado = "CREATE TABLE IF NOT EXISTS `devoluciones_estado` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -115,8 +122,157 @@ if ($action === 'add_bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$stmtIns->execute()) { http_response_code(500); echo 'Error al asignar: ' . esc($stmtIns->error); exit; }
     }
     $stmtIns->close();
-    $quedan = $restantes - $cantAsignar;
-    echo '<div class="msg-ok">Asignadas ' . esc($cantAsignar) . ' unidad(es) como ' . esc($estado) . '. Restantes: ' . esc($quedan) . '.</div>';
+
+    // Recalcular conteos por estado para la devolución
+    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'otros'=>0];
+    $stmtC = $mysqli->prepare('SELECT estado, COUNT(*) c FROM devoluciones_estado WHERE devolucion_id = ? GROUP BY estado');
+    $stmtC->bind_param('i', $devId);
+    $stmtC->execute();
+    $resC = $stmtC->get_result();
+    $asignados = 0;
+    while ($rc = $resC->fetch_assoc()) {
+        $st = (string)$rc['estado'];
+        $c = (int)$rc['c'];
+        if (isset($counts[$st])) { $counts[$st] = $c; } else { $counts['otros'] += $c; }
+        $asignados += $c;
+    }
+    $stmtC->close();
+    $quedan = max(0, $cantTotal - $asignados);
+
+    $message = 'Asignadas ' . $cantAsignar . ' unidad(es) como ' . $estado . '. Restantes: ' . $quedan . '.';
+    if (wants_json()) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => true,
+            'devolucion_id' => $devId,
+            'assigned' => $cantAsignar,
+            'estado' => $estado,
+            'counts' => $counts,
+            'restantes' => $quedan,
+            'asignados' => $asignados,
+            'total' => $cantTotal,
+            'message' => $message,
+        ]);
+    } else {
+        echo '<div class="msg-ok">' . esc($message) . '</div>';
+    }
+    exit;
+}
+
+if ($action === 'undo_all' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Deshacer TODO: eliminar todas las asignaciones de esa devolución
+    $devId = isset($_POST['devolucion_id']) ? (int)$_POST['devolucion_id'] : 0;
+    if ($devId <= 0) { http_response_code(400); echo 'Parámetros inválidos'; exit; }
+
+    // Cantidad total de esa devolución
+    $stmt = $mysqli->prepare('SELECT cantidad FROM devoluciones_por_cliente WHERE id = ?');
+    $stmt->bind_param('i', $devId);
+    $stmt->execute();
+    $stmt->bind_result($cantTotal);
+    if (!$stmt->fetch()) { $stmt->close(); http_response_code(404); echo 'Devolución no encontrada'; exit; }
+    $stmt->close();
+    $cantTotal = (int)round((float)$cantTotal);
+    if ($cantTotal < 1) $cantTotal = 1;
+
+    // Borrar todas las asignaciones para la devolución
+    $stmtD = $mysqli->prepare('DELETE FROM devoluciones_estado WHERE devolucion_id = ?');
+    $stmtD->bind_param('i', $devId);
+    if (!$stmtD->execute()) { http_response_code(500); echo 'Error al deshacer: ' . esc($stmtD->error); exit; }
+    $removidas = $stmtD->affected_rows;
+    $stmtD->close();
+
+    // Tras borrar todo, conteos quedan a cero y restantes = total
+    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'otros'=>0];
+    $asignados = 0;
+    $quedan = $cantTotal;
+
+    $message = 'Se deshicieron todas las asignaciones. Restantes: ' . $quedan . '.';
+    if (wants_json()) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => true,
+            'devolucion_id' => $devId,
+            'removed' => (int)$removidas,
+            'counts' => $counts,
+            'restantes' => $quedan,
+            'asignados' => $asignados,
+            'total' => $cantTotal,
+            'message' => $message,
+        ]);
+    } else {
+        echo '<div class="msg-ok">' . esc($message) . '</div>';
+    }
+    exit;
+}
+
+if ($action === 'vehiculos' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    // Listar vehículos del día con su estado de completitud (asignados vs total)
+    $fecha = isset($_GET['fecha']) ? trim($_GET['fecha']) : '';
+    $codVend = isset($_GET['cod_vendedor']) ? trim($_GET['cod_vendedor']) : '';
+    $codCli = isset($_GET['cod_cliente']) ? trim($_GET['cod_cliente']) : '';
+    if ($fecha === '') { http_response_code(400); echo 'Fecha requerida'; exit; }
+
+    $where = ['d.fecha = ?'];
+    $types = 's';
+    $params = [$fecha];
+    if ($codVend !== '') { $where[] = 'd.codigovendedor = ?'; $types .= 's'; $params[] = $codVend; }
+    if ($codCli !== '') { $where[] = 'd.codigocliente = ?'; $types .= 's'; $params[] = $codCli; }
+
+    // 1) Totales por vehículo (sin joins para no inflar valores)
+    $sqlTot = 'SELECT COALESCE(NULLIF(TRIM(vehiculo), \'\'), \'\') AS veh,
+                      SUM(ROUND(cantidad)) AS total
+               FROM devoluciones_por_cliente d
+               WHERE ' . implode(' AND ', $where) . '
+               GROUP BY veh';
+    $stmtT = $mysqli->prepare($sqlTot);
+    $stmtT->bind_param($types, ...$params);
+    $stmtT->execute();
+    $resT = $stmtT->get_result();
+    $map = [];
+    while ($r = $resT->fetch_assoc()) {
+        $veh = (string)$r['veh'];
+        $map[$veh] = [ 'total' => max(0, (int)$r['total']), 'asignados' => 0 ];
+    }
+    $stmtT->close();
+
+    // 2) Asignados por vehículo (contando unidades en devoluciones_estado)
+    $sqlAsg = 'SELECT COALESCE(NULLIF(TRIM(d.vehiculo), \'\'), \'\') AS veh,
+                      COUNT(e.id) AS asignados
+               FROM devoluciones_estado e
+               JOIN devoluciones_por_cliente d ON d.id = e.devolucion_id
+               WHERE ' . implode(' AND ', $where) . '
+               GROUP BY veh';
+    $stmtA = $mysqli->prepare($sqlAsg);
+    $stmtA->bind_param($types, ...$params);
+    $stmtA->execute();
+    $resA = $stmtA->get_result();
+    while ($r = $resA->fetch_assoc()) {
+        $veh = (string)$r['veh'];
+        $asg = max(0, (int)$r['asignados']);
+        if (!isset($map[$veh])) { $map[$veh] = ['total'=>0, 'asignados'=>0]; }
+        $map[$veh]['asignados'] = $asg;
+    }
+    $stmtA->close();
+
+    // 3) Construir respuesta ordenada por veh
+    ksort($map, SORT_NATURAL | SORT_FLAG_CASE);
+    $data = [];
+    foreach ($map as $veh => $vals) {
+        $total = (int)$vals['total'];
+        $asign = (int)$vals['asignados'];
+        $label = ($veh === '') ? 'SIN VEHICULO' : $veh;
+        $complete = ($total > 0) ? ($asign >= $total) : true;
+        $data[] = [
+            'value' => $veh,
+            'label' => $label,
+            'total' => $total,
+            'asignados' => $asign,
+            'complete' => $complete,
+        ];
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok'=>true, 'vehiculos'=>$data]);
     exit;
 }
 
@@ -182,7 +338,11 @@ $opciones = [
 ob_start();
 foreach ($porVeh as $vehiculo => $lista) {
     echo '<div class="bloque-vehiculo">';
-    echo '<h3>Camión ' . esc($vehiculo) . '</h3>';
+    echo '<div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">';
+    echo '<h3 style="margin:6px 0;">Camión ' . esc($vehiculo) . '</h3>';
+    echo '<button type="button" class="btn-ok-restantes" data-vehiculo="' . esc($vehiculo) . '"'
+        . ' style="background:#198754;color:#fff;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;">OK_Restantes</button>';
+    echo '</div>';
     echo '<table>';
     echo '<thead><tr>'
         .'<th>Cod_Vend</th><th>Cod_Cliente</th><th>Nombre Cliente</th><th>Cod_Prod</th><th>Producto</th><th>Cantidad</th><th>Estados</th>'
@@ -202,36 +362,74 @@ foreach ($porVeh as $vehiculo => $lista) {
         }
         $restan = max(0, $cant - $asignados);
 
-        echo '<tr id="row-dev-' . $id . '">';
-        echo '<td>' . esc($r['codigovendedor']) . '</td>';
-        echo '<td>' . esc($r['codigocliente']) . '</td>';
-        echo '<td>' . esc($r['nombrecliente']) . '</td>';
-        echo '<td>' . esc($r['codigoproducto']) . '</td>';
-        echo '<td>' . esc($r['nombreproducto']) . '</td>';
-        echo '<td style="text-align:right;">' . esc($cant) . '</td>';
-        echo '<td>';
-        echo '<div class="estado-resumen">'
-            . 'OK: ' . esc($counts['OK'])
-            . ' | Sin compra: ' . esc($counts['Sin compra'])
-            . ' | No llego al almacen: ' . esc($counts['No llego al almacen'])
-            . ($counts['__otros']>0 ? ' | Otros: ' . esc($counts['__otros']) : '')
-            . ' | Restan: <strong>' . esc($restan) . '</strong>'
-            . '</div>';
-        // Formulario masivo por fila
-        echo '<form class="form-bulk" method="post" action="devoluciones_gestion.php" style="margin-top:6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">'
-            . '<input type="hidden" name="action" value="add_bulk">'
-            . '<input type="hidden" name="devolucion_id" value="' . $id . '">'
-            . '<label>Cant: <input type="number" name="cantidad" min="1" max="' . esc($restan) . '" value="' . ($restan>0?1:0) . '" ' . ($restan>0?'':'disabled') . ' style="width:80px; padding:4px;"></label>'
-            . '<select name="estado" ' . ($restan>0?'':'disabled') . ' class="estado-select">';
-        foreach ($opciones as $val => $label) {
-            if ($val==='') continue;
-            echo '<option value="' . esc($val) . '">' . esc($label) . '</option>';
+        // Construir filas en buffer para poder adjuntar 'Deshacer' cuando no haya pendientes
+        $bufferRows = [];
+        $clasificaciones = [
+            'OK' => $counts['OK'],
+            'Sin compra' => $counts['Sin compra'],
+            'No llego al almacen' => $counts['No llego al almacen']
+        ];
+        foreach ($clasificaciones as $nombre => $num) {
+            if ($num <= 0) continue;
+            $bufferRows[] = [ 'estado' => $nombre, 'cantidad' => $num ];
         }
-        echo '</select>'
-            . '<button type="submit" ' . ($restan>0?'':'disabled') . '>Agregar</button>'
-            . '</form>';
-        echo '</td>';
-        echo '</tr>';
+        if ($counts['__otros'] > 0) {
+            $bufferRows[] = [ 'estado' => 'Otros', 'cantidad' => (int)$counts['__otros'] ];
+        }
+
+        $printed = 0; $totalRows = count($bufferRows);
+        foreach ($bufferRows as $rowInfo) {
+            $printed++;
+            $isLast = ($printed === $totalRows);
+            echo '<tr class="dev-row dev-row-class" data-dev-id="' . $id . '" data-estado="' . esc($rowInfo['estado']) . '">';
+            echo '<td>' . esc($r['codigovendedor']) . '</td>';
+            echo '<td>' . esc($r['codigocliente']) . '</td>';
+            echo '<td>' . esc($r['nombrecliente']) . '</td>';
+            echo '<td>' . esc($r['codigoproducto']) . '</td>';
+            echo '<td>' . esc($r['nombreproducto']) . '</td>';
+            echo '<td style="text-align:right;">' . esc($rowInfo['cantidad']) . '</td>';
+            echo '<td>' . esc($rowInfo['estado']);
+            // Si no hay pendientes y hay algo asignado, mostrar Deshacer en la última fila de clasificación
+            if ($restan === 0 && $asignados > 0 && $isLast) {
+                echo ' &nbsp; ';
+                echo '<form class="form-bulk" method="post" action="devoluciones_gestion.php" style="display:inline-block; margin-left:6px;">'
+                    . '<input type="hidden" name="action" value="undo_all">'
+                    . '<input type="hidden" name="devolucion_id" value="' . $id . '">'
+                    . '<button type="submit" data-undo="1" class="btn-undo" style="background:#dc3545;color:#fff;border:none;padding:4px 8px;border-radius:4px;">Deshacer</button>'
+                    . '</form>';
+            }
+            echo '</td>';
+            echo '</tr>';
+        }
+
+        // Fila de pendientes/acciones (solo si restan unidades)
+        if ($restan > 0) {
+            echo '<tr class="dev-row dev-row-pend" data-dev-id="' . $id . '">';
+            echo '<td>' . esc($r['codigovendedor']) . '</td>';
+            echo '<td>' . esc($r['codigocliente']) . '</td>';
+            echo '<td>' . esc($r['nombrecliente']) . '</td>';
+            echo '<td>' . esc($r['codigoproducto']) . '</td>';
+            echo '<td>' . esc($r['nombreproducto']) . '</td>';
+            echo '<td style="text-align:right;">' . esc($restan) . '</td>';
+            echo '<td>';
+            // Formulario masivo por fila (pendientes)
+            echo '<form class="form-bulk" method="post" action="devoluciones_gestion.php" style="margin-top:6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">'
+                . '<input type="hidden" name="action" value="add_bulk">'
+                . '<input type="hidden" name="devolucion_id" value="' . $id . '">'
+                . '<label>Cant: <input type="number" name="cantidad" min="1" max="' . esc($restan) . '" value="' . ($restan>0?$restan:0) . '" ' . ($restan>0?'':'disabled') . ' style="width:80px; padding:4px;"></label>'
+                . '<select name="estado" ' . ($restan>0?'':'disabled') . ' class="estado-select">';
+            foreach ($opciones as $val => $label) {
+                if ($val==='') continue;
+                echo '<option value="' . esc($val) . '">' . esc($label) . '</option>';
+            }
+            echo '</select>'
+                . '<button type="submit" ' . ($restan>0?'':'disabled') . '>Agregar</button>'
+                . '<button type="submit" data-undo="1" class="btn-undo" ' . ($asignados>0?'':'disabled') . ' style="background:#dc3545;color:#fff;border:none;padding:6px 10px;border-radius:4px;">Deshacer</button>'
+                . '</form>'
+                . '<div class="msg-ajax" style="margin-top:4px;"></div>';
+            echo '</td>';
+            echo '</tr>';
+        }
     }
     echo '</tbody></table>';
     echo '</div>';
