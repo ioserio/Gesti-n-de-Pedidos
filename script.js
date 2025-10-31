@@ -478,6 +478,8 @@ function cargarRecojos(){
     const fechaDesde = document.getElementById('fecha_recojo_desde')?.value || '';
     const fechaHasta = document.getElementById('fecha_recojo_hasta')?.value || '';
     const vd = document.getElementById('vd_recojo')?.value || '';
+    const cliente = document.getElementById('cliente_recojo')?.value || '';
+    const supervisor = document.getElementById('supervisor_recojo')?.value || '';
     const pend = document.getElementById('recojo_pend')?.checked || false;
     cont.innerHTML = '<p>Cargando...</p>';
     const params = new URLSearchParams();
@@ -488,6 +490,8 @@ function cargarRecojos(){
         if (fechaHasta) params.append('fecha_hasta', fechaHasta);
     }
     if (vd) params.append('cod_vendedor', vd);
+    if (cliente) params.append('cliente', cliente);
+    if (supervisor) params.append('supervisor', supervisor);
     if (pend) params.append('pendientes', '1');
     fetch('recojos_consulta.php?' + params.toString())
         .then(r => {

@@ -1,3 +1,8 @@
+/* Estilo para la columna de fecha en la tabla de recojos */
+table th:first-child, table td:first-child {
+    min-width: 110px;
+    white-space: nowrap;
+}
 @media print {
     @page {
         margin: 0;

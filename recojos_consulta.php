@@ -11,7 +11,27 @@ $fecha = isset($_GET['fecha']) ? trim($_GET['fecha']) : '';
 $fechaDesde = isset($_GET['fecha_desde']) ? trim($_GET['fecha_desde']) : '';
 $fechaHasta = isset($_GET['fecha_hasta']) ? trim($_GET['fecha_hasta']) : '';
 $vd = isset($_GET['cod_vendedor']) ? trim($_GET['cod_vendedor']) : '';
+$cliente = isset($_GET['cliente']) ? trim($_GET['cliente']) : '';
+$supervisor = isset($_GET['supervisor']) ? trim($_GET['supervisor']) : '';
 $onlyPending = isset($_GET['pendientes']) && ($_GET['pendientes'] === '1' || strtolower($_GET['pendientes']) === 'true');
+// Mapa VD => SUPERVISOR (para filtros internos)
+$vd_supervisor = [
+    '011'=>'CARLOS','016'=>'CARLOS','023'=>'JOSE','026'=>'JESUS','028'=>'CARLOS','029'=>'CARLOS','030'=>'CARLOS',
+    '102'=>'JESUS','104'=>'JOSE','106'=>'JESUS','108'=>'JOSE','110'=>'JESUS','113'=>'JESUS','114'=>'JESUS','118'=>'JESUS',
+    '997'=>'FRANCISCO','777'=>'OFICINA','999'=>'OFICINA','004'=>'JOSE','005'=>'CARLOS','012'=>'JOSE','014'=>'JESUS',
+    '018'=>'JESUS','024'=>'FRANCISCO','025'=>'FRANCISCO','027'=>'CARLOS','101'=>'JOSE','103'=>'JOSE','105'=>'CARLOS',
+    '107'=>'JOSE','109'=>'JESUS','606'=>'FRANCISCO','607'=>'FRANCISCO','001'=>'JOSE','002'=>'JOSE','003'=>'JOSE',
+    '007'=>'JOSE','008'=>'JESUS','009'=>'JESUS','010'=>'JOSE','013'=>'JESUS','021'=>'CARLOS','022'=>'CARLOS',
+    '115'=>'CARLOS','116'=>'CARLOS','119'=>'CARLOS','604'=>'FRANCISCO','605'=>'FRANCISCO'
+];
+// Precomputar conjunto de VDs del supervisor seleccionado (si aplica)
+$vendSupSet = null;
+if ($supervisor !== '') {
+    $vendSupSet = [];
+    foreach ($vd_supervisor as $code => $sup) {
+        if ($sup === $supervisor) { $vendSupSet[$code] = true; }
+    }
+}
 // Traer devoluciones con filtros opcionales (fecha exacta o rango) y vendedor
 $where = [];
 $types = '';
@@ -22,7 +42,15 @@ if ($fecha !== '') {
     if ($fechaDesde !== '') { $where[] = 'd.fecha >= ?'; $types .= 's'; $params[] = $fechaDesde; }
     if ($fechaHasta !== '') { $where[] = 'd.fecha <= ?'; $types .= 's'; $params[] = $fechaHasta; }
 }
+
 if ($vd !== '')    { $where[] = 'TRIM(d.codigovendedor) = ?'; $types .= 's'; $params[] = $vd; }
+if ($cliente !== '') {
+    // Buscar por código exacto o nombre parcial (case-insensitive)
+    $where[] = '(TRIM(d.codigocliente) = ? OR LOWER(TRIM(d.nombrecliente)) LIKE ?)';
+    $types .= 'ss';
+    $params[] = $cliente;
+    $params[] = '%' . mb_strtolower($cliente, 'UTF-8') . '%';
+}
 if (empty($where)) { $where[] = '1=1'; }
 
 $sql = 'SELECT d.id, d.fecha, COALESCE(NULLIF(TRIM(d.vehiculo), \'\'), \'SIN VEHICULO\') as vehiculo,
@@ -70,6 +98,16 @@ echo '<thead><tr>'
 
 $mostro = false;
 foreach ($rows as $r) {
+    // Filtrar por supervisor si se seleccionó
+    if (!empty($supervisor) && is_array($vendSupSet)) {
+        $vdRaw = trim((string)$r['codigovendedor']);
+        $vdNoZeros = ltrim($vdRaw, '0');
+        if ($vdNoZeros === '') { $vdNoZeros = '0'; }
+        $vdPadded3 = str_pad($vdNoZeros, 3, '0', STR_PAD_LEFT);
+        if (!isset($vendSupSet[$vdRaw]) && !isset($vendSupSet[$vdNoZeros]) && !isset($vendSupSet[$vdPadded3])) {
+            continue;
+        }
+    }
     $id = (int)$r['id'];
     $cant = (int)$r['cantidad'];
     $veh = trim((string)$r['vehiculo']);
