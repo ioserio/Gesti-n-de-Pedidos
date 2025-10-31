@@ -61,71 +61,65 @@ if (!empty($ids)) {
     $stmtE->close();
 }
 
-// Agrupar por vehículo
-$porVeh = [];
-foreach ($rows as $r) {
-    $key = trim((string)$r['vehiculo']);
-    if ($key === '') $key = 'SIN VEHICULO';
-    $porVeh[$key][] = $r;
-}
-
+// Tabla plana; reordenamos columnas para que Fecha sea la primera
 ob_start();
-foreach ($porVeh as $veh => $lista) {
-    echo '<div class="bloque-vehiculo">';
-    echo '<h3>Camión ' . esc($veh) . '</h3>';
-    echo '<table>';
-    echo '<thead><tr>'
-        .'<th>Fecha</th><th>Cod_Cliente</th><th>Nombre Cliente</th><th>Cod_Prod</th><th>Producto</th><th>Cantidad</th><th>Estado</th>'
-        .'</tr></thead><tbody>';
-    $mostro = false;
-    foreach ($lista as $r) {
-        $id = (int)$r['id'];
-        $cant = (int)$r['cantidad'];
-        $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0];
-        if (isset($estadosMap[$id])) {
-            foreach ($estadosMap[$id] as $st => $c) { if (isset($counts[$st])) $counts[$st] = (int)$c; }
-        }
-        $asignados = $counts['OK'] + $counts['No llego al almacen'] + $counts['Sin compra'];
-        $restan = max(0, $cant - $asignados);
-        $restanOk = max(0, $cant - $counts['OK']); // unidades que aún NO están en OK
-        // Si filtramos pendientes, sólo mostrar items donde todavía faltan OK
-        if ($onlyPending && $restanOk <= 0) { continue; }
+echo '<table>';
+echo '<thead><tr>'
+    .'<th>Fecha</th><th>Camión</th><th>Cod_Vend</th><th>Cod_Cliente</th><th>Nombre Cliente</th><th>Cod_Prod</th><th>Producto</th><th>Cantidad</th><th>Estado</th>'
+    .'</tr></thead><tbody>';
 
-        // Imprimir sub-líneas por clasificación y una de pendientes si aplica (como en gestión)
-        // Si está activo "pendientes", ocultamos la línea OK y mostramos sólo no-OK y Pendientes
-        $lineas = [];
-        if (!$onlyPending && $counts['OK'] > 0) {
-            $lineas[] = ['estado' => 'OK', 'cantidad' => $counts['OK']];
-        }
-        if ($counts['Sin compra'] > 0) $lineas[] = ['estado' => 'Sin compra', 'cantidad' => $counts['Sin compra']];
-        if ($counts['No llego al almacen'] > 0) $lineas[] = ['estado' => 'No llego al almacen', 'cantidad' => $counts['No llego al almacen']];
-        if ($restan > 0) $lineas[] = ['estado' => 'Pendientes', 'cantidad' => $restan];
+$mostro = false;
+foreach ($rows as $r) {
+    $id = (int)$r['id'];
+    $cant = (int)$r['cantidad'];
+    $veh = trim((string)$r['vehiculo']);
+    if ($veh === '') $veh = 'SIN VEHICULO';
+    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0];
+    if (isset($estadosMap[$id])) {
+        foreach ($estadosMap[$id] as $st => $c) { if (isset($counts[$st])) $counts[$st] = (int)$c; }
+    }
+    $asignados = $counts['OK'] + $counts['No llego al almacen'] + $counts['Sin compra'] + $counts['No autorizado'];
+    $restan = max(0, $cant - $asignados);
+    $restanOk = max(0, $cant - $counts['OK']); // unidades que aún NO están en OK
+    // Si filtramos pendientes, sólo mostrar items donde todavía faltan OK
+    if ($onlyPending && $restanOk <= 0) { continue; }
 
-        if (empty($lineas)) {
-            // Nada que mostrar (raro, pero por seguridad)
-            continue;
-        }
-        $mostro = true;
-        foreach ($lineas as $ln) {
-            echo '<tr>';
-            echo '<td>' . esc($r['fecha']) . '</td>';
-            echo '<td>' . esc($r['codigocliente']) . '</td>';
-            echo '<td>' . esc($r['nombrecliente']) . '</td>';
-            echo '<td>' . esc($r['codigoproducto']) . '</td>';
-            echo '<td>' . esc($r['nombreproducto']) . '</td>';
-            echo '<td style="text-align:right;">' . esc($ln['cantidad']) . '</td>';
-            // Mostrar "Restan OK" como badge cuando filtramos pendientes o cuando estado no es OK
-            $badge = ($restanOk > 0 && $ln['estado'] !== 'OK') ? ' <span style="color:#555; font-size:12px;">(Restan OK: ' . esc($restanOk) . ')</span>' : '';
-            echo '<td>' . esc($ln['estado']) . $badge . '</td>';
-            echo '</tr>';
-        }
+    // Imprimir sub-líneas por clasificación y una de pendientes si aplica (como en gestión)
+    // Si está activo "pendientes", ocultamos la línea OK y mostramos sólo no-OK y Pendientes
+    $lineas = [];
+    if (!$onlyPending && $counts['OK'] > 0) {
+        $lineas[] = ['estado' => 'OK', 'cantidad' => $counts['OK']];
     }
-    if (!$mostro) {
-        echo '<tr><td colspan="7" style="text-align:center; color:#666;">' . ($onlyPending ? 'Sin pendientes en este camión' : 'Sin resultados en este camión') . '</td></tr>';
+    if ($counts['Sin compra'] > 0) $lineas[] = ['estado' => 'Sin compra', 'cantidad' => $counts['Sin compra']];
+    if ($counts['No llego al almacen'] > 0) $lineas[] = ['estado' => 'No llego al almacen', 'cantidad' => $counts['No llego al almacen']];
+    if ($counts['No autorizado'] > 0) $lineas[] = ['estado' => 'No autorizado', 'cantidad' => $counts['No autorizado']];
+    if ($restan > 0) $lineas[] = ['estado' => 'Pendientes', 'cantidad' => $restan];
+
+    if (empty($lineas)) {
+        // Nada que mostrar (raro, pero por seguridad)
+        continue;
     }
-    echo '</tbody></table>';
-    echo '</div>';
+    $mostro = true;
+    foreach ($lineas as $ln) {
+        echo '<tr>';
+        // Nueva disposición de columnas: Fecha primero, luego Camión y Cod_Vend
+        echo '<td>' . esc($r['fecha']) . '</td>';
+        echo '<td>' . esc($veh) . '</td>';
+        echo '<td>' . esc($r['codigovendedor']) . '</td>';
+        echo '<td>' . esc($r['codigocliente']) . '</td>';
+        echo '<td>' . esc($r['nombrecliente']) . '</td>';
+        echo '<td>' . esc($r['codigoproducto']) . '</td>';
+        echo '<td>' . esc($r['nombreproducto']) . '</td>';
+        echo '<td style="text-align:right;">' . esc($ln['cantidad']) . '</td>';
+        // Ya no mostramos el badge de "Restan OK" en esta tabla
+        echo '<td>' . esc($ln['estado']) . '</td>';
+        echo '</tr>';
+    }
 }
+if (!$mostro) {
+    echo '<tr><td colspan="9" style="text-align:center; color:#666;">' . ($onlyPending ? 'Sin pendientes' : 'Sin resultados') . '</td></tr>';
+}
+echo '</tbody></table>';
 $html = ob_get_clean();
 
 echo $html ?: '<p>Sin resultados.</p>';

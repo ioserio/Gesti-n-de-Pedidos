@@ -56,6 +56,8 @@ window.mostrarModulo = function(modulo) {
             if (fechaInput) {
                 cargarResumen(fechaInput.value);
             }
+            // Cargar la etiqueta de última actualización
+            try { cargarUltimaActualizacion(); } catch(_) {}
         }, 100);
     } else if (modulo === 'admin') {
         // Cargar lista de cuotas
@@ -77,6 +79,14 @@ window.mostrarModulo = function(modulo) {
     }
 }
 
+    function cargarUltimaActualizacion(){
+        const lbl = document.getElementById('ultima_actualizacion');
+        if (!lbl) return;
+        fetch('ultima_actualizacion.php')
+            .then(r => r.text())
+            .then(txt => { lbl.textContent = txt; })
+            .catch(() => { lbl.textContent = 'Ultima actualizacion: -'; });
+    }
 function cargarResumen(fecha) {
     const resumen = document.getElementById('resumen');
     const supervisor = document.getElementById('supervisor_resumen') ? document.getElementById('supervisor_resumen').value : '';
@@ -105,6 +115,8 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const fecha = document.getElementById('fecha_resumen').value;
             cargarResumen(fecha);
+            // Refrescar la última actualización por si hubo cambios recientes
+            try { cargarUltimaActualizacion(); } catch(_) {}
         });
         // Actualizar resumen al cambiar supervisor
         const supervisorSelect = document.getElementById('supervisor_resumen');
@@ -112,6 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
             supervisorSelect.addEventListener('change', function() {
                 const fecha = document.getElementById('fecha_resumen').value;
                 cargarResumen(fecha);
+                try { cargarUltimaActualizacion(); } catch(_) {}
             });
         }
     }
@@ -256,8 +269,9 @@ document.addEventListener('DOMContentLoaded', function(){
             const ok = counts.OK || 0;
             const sc = counts['Sin compra'] || 0;
             const nla = counts['No llego al almacen'] || 0;
+            const na = counts['No autorizado'] || 0;
             const otros = counts.otros || 0;
-            const asignados = ok + sc + nla + otros;
+            const asignados = ok + sc + nla + na + otros;
             const restantes = Math.max(0, (data && data.restantes != null) ? data.restantes : (total - asignados));
 
             function rowHtml(cant, etiqueta, isLast, canUndo){
@@ -277,6 +291,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     + '<option value="OK">OK</option>'
                     + '<option value="No llego al almacen">No llego al almacen</option>'
                     + '<option value="Sin compra">Sin compra</option>'
+                    + '<option value="No autorizado">No autorizado</option>'
                     + '</select>';
                 const form = '<form class="form-bulk" method="post" action="devoluciones_gestion.php" style="margin-top:6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">'
                     + '<input type="hidden" name="action" value="add_bulk">'
@@ -304,6 +319,7 @@ document.addEventListener('DOMContentLoaded', function(){
             if (ok > 0) parts.push(['OK', ok]);
             if (sc > 0) parts.push(['Sin compra', sc]);
             if (nla > 0) parts.push(['No llego al almacen', nla]);
+            if (na > 0) parts.push(['No autorizado', na]);
             if (otros > 0) parts.push(['Otros', otros]);
             const canUndoInline = (restantes === 0 && asignados > 0);
             parts.forEach((p, idx) => {

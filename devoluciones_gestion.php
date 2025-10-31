@@ -21,7 +21,7 @@ $createEstado = "CREATE TABLE IF NOT EXISTS `devoluciones_estado` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `devolucion_id` INT UNSIGNED NOT NULL,
     `unidad_index` INT UNSIGNED NOT NULL,
-    `estado` ENUM('OK','No llego al almacen','Sin compra') NOT NULL,
+    `estado` ENUM('OK','No llego al almacen','Sin compra','No autorizado') NOT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY `uniq_dev_unit` (`devolucion_id`, `unidad_index`),
     KEY `idx_dev` (`devolucion_id`),
@@ -30,6 +30,9 @@ $createEstado = "CREATE TABLE IF NOT EXISTS `devoluciones_estado` (
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
 $mysqli->query($createEstado);
+
+// Intentar ajustar el ENUM si la tabla ya existía sin la opción "No autorizado"
+@$mysqli->query("ALTER TABLE `devoluciones_estado` MODIFY COLUMN `estado` ENUM('OK','No llego al almacen','Sin compra','No autorizado') NOT NULL");
 
 $action = isset($_REQUEST['action']) ? $_REQUEST['action'] : 'view';
 
@@ -82,7 +85,7 @@ if ($action === 'add_bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $devId = isset($_POST['devolucion_id']) ? (int)$_POST['devolucion_id'] : 0;
     $cantAsignar = isset($_POST['cantidad']) ? (int)$_POST['cantidad'] : 0;
     $estado = isset($_POST['estado']) ? trim($_POST['estado']) : '';
-    $permitidos = ['OK','No llego al almacen','Sin compra'];
+    $permitidos = ['OK','No llego al almacen','Sin compra','No autorizado'];
     if (!in_array($estado, $permitidos, true)) { http_response_code(400); echo 'Estado no válido'; exit; }
     if ($devId <= 0 || $cantAsignar <= 0) { http_response_code(400); echo 'Parámetros inválidos'; exit; }
 
@@ -124,7 +127,7 @@ if ($action === 'add_bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtIns->close();
 
     // Recalcular conteos por estado para la devolución
-    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'otros'=>0];
+    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'otros'=>0];
     $stmtC = $mysqli->prepare('SELECT estado, COUNT(*) c FROM devoluciones_estado WHERE devolucion_id = ? GROUP BY estado');
     $stmtC->bind_param('i', $devId);
     $stmtC->execute();
@@ -182,7 +185,7 @@ if ($action === 'undo_all' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtD->close();
 
     // Tras borrar todo, conteos quedan a cero y restantes = total
-    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'otros'=>0];
+    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'otros'=>0];
     $asignados = 0;
     $quedan = $cantTotal;
 
@@ -332,7 +335,8 @@ $opciones = [
     '' => '-- estado --',
     'OK' => 'OK',
     'No llego al almacen' => 'No llego al almacen',
-    'Sin compra' => 'Sin compra'
+    'Sin compra' => 'Sin compra',
+    'No autorizado' => 'No autorizado',
 ];
 
 ob_start();
@@ -352,7 +356,7 @@ foreach ($porVeh as $vehiculo => $lista) {
         $cant = (int)round((float)$r['cantidad']);
         if ($cant < 1) $cant = 1;
         // Resumen de estados ya asignados
-        $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'__otros'=>0];
+    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'__otros'=>0];
         $asignados = 0;
         if (isset($estadosMap[$id])) {
             foreach ($estadosMap[$id] as $st) {
@@ -367,7 +371,8 @@ foreach ($porVeh as $vehiculo => $lista) {
         $clasificaciones = [
             'OK' => $counts['OK'],
             'Sin compra' => $counts['Sin compra'],
-            'No llego al almacen' => $counts['No llego al almacen']
+            'No llego al almacen' => $counts['No llego al almacen'],
+            'No autorizado' => $counts['No autorizado'],
         ];
         foreach ($clasificaciones as $nombre => $num) {
             if ($num <= 0) continue;

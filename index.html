@@ -61,7 +61,7 @@
     </section>
     <section id="modulo-resumen" style="display:none;">
         <h2>Resumen de Pedidos por Vendedor</h2>
-        <form id="form-resumen" style="margin-bottom:20px;">
+    <form id="form-resumen" style="margin-bottom:20px; display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
             <label for="fecha_resumen">Fecha:</label>
             <input type="date" id="fecha_resumen" name="fecha_resumen" value="" required>
             <label for="supervisor_resumen" style="margin-left:15px;"><b>Supervisor:</b></label>
@@ -74,6 +74,7 @@
                 <option value="OFICINA">OFICINA</option>
             </select>
             <button type="submit">Consultar</button>
+            <span id="ultima_actualizacion" style="margin-left:auto; color:#555; font-weight:600; white-space:nowrap;"></span>
         </form>
         <div id="resumen"></div>
     </section>
