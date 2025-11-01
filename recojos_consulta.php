@@ -60,7 +60,7 @@ $sql = 'SELECT d.id, d.fecha, COALESCE(NULLIF(TRIM(d.vehiculo), \'\'), \'SIN VEH
            ROUND(d.cantidad) as cantidad
     FROM devoluciones_por_cliente d
     WHERE ' . implode(' AND ', $where) . '
-    ORDER BY vehiculo, d.fecha, d.codigocliente, d.codigoproducto';
+    ORDER BY d.fecha ASC, vehiculo, d.codigocliente, d.codigoproducto';
 $stmt = $mysqli->prepare($sql);
 if ($types !== '') { $stmt->bind_param($types, ...$params); }
 $stmt->execute();
