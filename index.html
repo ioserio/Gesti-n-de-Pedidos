@@ -9,10 +9,12 @@
 <body>
     <header>
         <nav>
+            <a href="index.html" class="brand-logo" aria-label="RikFlex Home">RikFlex</a>
             <ul class="menu">
-                <li><a href="#" onclick="mostrarModulo('subir')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l4 4h-3v6h-2V7H8l4-4z"/><path d="M4 14h16v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/></svg></span>Subir Pedidos</a></li>
+                <li><a href="#" onclick="mostrarModulo('subir')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l4 4h-3v6h-2V7H8l4-4z"/><path d="M4 14h16v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/></svg></span>Importar</a></li>
                 <li><a href="#" onclick="mostrarModulo('consultar')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"/></svg></span>Consultar por Vendedor</a></li>
                 <li><a href="#" onclick="mostrarModulo('resumen')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="10" width="4" height="10" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span>Resumen de Pedidos</a></li>
+                <li><a href="#" onclick="mostrarModulo('cobranzas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 1a4 4 0 00-4 4v1H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a4 4 0 00-4-4zm-2 5V5a2 2 0 114 0v1h-4z"/></svg></span>Gestión de Cobranzas</a></li>
                 <li class="has-submenu">
                     <a href="#" onclick="mostrarModulo('devoluciones')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v4H7l5 5 5-5h-5V5z"/><path d="M5 19h14v-2H5v2z"/></svg></span>Gestión de Devoluciones</a>
                     <ul class="submenu">
@@ -49,6 +51,19 @@
             </label>
             <button type="submit" style="margin-left:14px;">Subir Devoluciones</button>
         </form>
+
+        <hr style="margin:24px 0;">
+
+        <h2>Subir Excel de Cobranzas (Cuentas por Cobrar y Pagar)</h2>
+        <p>Selecciona tu archivo <b>CUENTAS POR COBRAR Y PAGAR.xlsx</b> para cargarlo en la tabla <code>cuentas_por_cobrar_pagar</code>.</p>
+        <form action="procesar_cobranzas.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
+            <input type="file" name="archivo_cobranzas" accept=".xlsx,.xls" required>
+            <label style="margin-left:14px; display:inline-flex; align-items:center; gap:6px;">
+                <input type="checkbox" name="truncate" value="1">
+                Vaciar tabla antes de importar
+            </label>
+            <button type="submit" style="margin-left:14px;">Subir Cobranzas</button>
+        </form>
     </section>
     <section id="modulo-consultar" style="display:none;">
         <h2>Consultar Pedidos por Vendedor</h2>
@@ -77,6 +92,15 @@
             <span id="ultima_actualizacion" style="margin-left:auto; color:#555; font-weight:600; white-space:nowrap;"></span>
         </form>
         <div id="resumen"></div>
+    </section>
+    <section id="modulo-cobranzas" style="display:none;">
+        <h2>Gestión de Cobranzas</h2>
+        <form id="form-cobranzas" style="margin-bottom:15px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <label for="vd_cobranza">Vendedor:</label>
+            <input type="text" id="vd_cobranza" name="cod_vendedor" placeholder="Ej: 021" style="width:90px;">
+            <button type="submit">Consultar</button>
+        </form>
+        <div id="cobranzas"></div>
     </section>
     <section id="modulo-admin" style="display:none;">
         <h2>Administrador de Cuotas</h2>

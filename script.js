@@ -42,6 +42,14 @@ window.mostrarModulo = function(modulo) {
     document.getElementById('modulo-subir').style.display = (modulo === 'subir') ? 'block' : 'none';
     document.getElementById('modulo-consultar').style.display = (modulo === 'consultar') ? 'block' : 'none';
     document.getElementById('modulo-resumen').style.display = (modulo === 'resumen') ? 'block' : 'none';
+    const cobr = document.getElementById('modulo-cobranzas');
+    if (cobr) cobr.style.display = (modulo === 'cobranzas') ? 'block' : 'none';
+    // Alternar modo ancho completo solo para cobranzas
+    const wrap = document.querySelector('.container');
+    if (wrap) {
+        if (modulo === 'cobranzas') wrap.classList.add('fullwidth');
+        else wrap.classList.remove('fullwidth');
+    }
     const admin = document.getElementById('modulo-admin');
     if (admin) admin.style.display = (modulo === 'admin') ? 'block' : 'none';
         const devol = document.getElementById('modulo-devoluciones');
@@ -76,6 +84,11 @@ window.mostrarModulo = function(modulo) {
                 const f = document.getElementById('fecha_recojo');
                 if (f) cargarRecojos();
             }, 100);
+        } else if (modulo === 'cobranzas') {
+            setTimeout(function(){
+                const cont = document.getElementById('cobranzas');
+                if (cont) cont.innerHTML = '<p>Ingrese el Vendedor y presione Consultar, o deje vacío para ver todos.</p>';
+            }, 50);
     }
 }
 
@@ -517,6 +530,30 @@ document.addEventListener('DOMContentLoaded', function(){
             const fecha = document.getElementById('fecha_recojo')?.value || '';
             if (vd && fecha) cargarRecojos();
         });
+    }
+});
+
+// Cobranzas: resumen por vendedor
+function cargarCobranzas(){
+    const cont = document.getElementById('cobranzas');
+    if (!cont) return;
+    const vd = document.getElementById('vd_cobranza')?.value || '';
+    cont.innerHTML = '<p>Cargando...</p>';
+    const qs = new URLSearchParams();
+    if (vd) qs.append('cod_vendedor', vd);
+    fetch('cobranzas_resumen.php' + (qs.toString() ? ('?' + qs.toString()) : ''))
+        .then(r => {
+            if (!r.ok) return r.text().then(t=>{ throw new Error(t||('HTTP '+r.status)); });
+            return r.text();
+        })
+        .then(html => { cont.innerHTML = html; })
+        .catch(err => { cont.innerHTML = '<p>Error al consultar cobranzas: ' + (err.message||'') + '</p>'; });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+    const formC = document.getElementById('form-cobranzas');
+    if (formC) {
+        formC.addEventListener('submit', function(e){ e.preventDefault(); cargarCobranzas(); });
     }
 });
 // Consulta AJAX para resumen de pedidos por fecha
