@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/require_login.php';
 // devoluciones_gestion.php
 // Gestión editable de devoluciones por fecha agrupadas por camión (vehículo)
 ini_set('display_errors', 1);

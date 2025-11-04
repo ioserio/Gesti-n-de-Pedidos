@@ -5,16 +5,16 @@ table th:first-child, table td:first-child {
 }
 @media print {
     @page {
-        margin: 0;
+    justify-content: flex-start;
     }
     body * {
         visibility: hidden !important;
     }
     #resumen, #resumen * {
-        visibility: visible !important;
+    padding: 0;
     }
     #resumen button, #resumen h2, #resumen form {
-        display: none !important;
+    margin: 6px 8px;
     }
     .container {
         box-shadow: none;
@@ -22,7 +22,7 @@ table th:first-child, table td:first-child {
         padding: 0 !important;
         max-width: 100vw !important;
         margin-top: 0 !important;
-        padding-top: 0 !important;
+    padding: 10px 8px;
     }
     #resumen {
         width: 100vw !important;
@@ -79,7 +79,8 @@ table th:first-child, table td:first-child {
     .menu {
         flex-wrap: wrap;
         align-items: center;
-        justify-content: space-around;
+        justify-content: flex-start;
+        gap: 8px;
     }
     .menu li {
         margin: 4px 6px;
@@ -157,6 +158,44 @@ table th:first-child, table td:first-child {
         display: none !important;
     }
 }
+/* Imprimir: solo la sección de cobranzas */
+@media print {
+    /* Orientación y márgenes para abarcar todas las columnas */
+    @page { size: landscape; margin: 10mm; }
+    body * { visibility: hidden !important; }
+    #cobranzas, #cobranzas * { visibility: visible !important; }
+    #cobranzas { position: absolute; left: 0; top: 0; width: 100%; background: #fff; box-shadow: none; margin: 0; padding: 0; }
+    #cobranzas button { display: none !important; }
+    /* La tabla de cobranzas debe ajustarse al ancho de la hoja */
+    #cobranzas .tabla-cobranzas { width: 100% !important; min-width: 0 !important; table-layout: fixed; font-size: 12px; border-spacing: 0 4px; }
+    #cobranzas .tabla-cobranzas th, #cobranzas .tabla-cobranzas td { padding: 6px; white-space: normal; word-break: normal; }
+    #cobranzas .tabla-cobranzas thead th { font-size: 13px; white-space: nowrap; }
+    /* Anchos por columna para la tabla de detalle (11 columnas) */
+    #cobranzas .tabla-cobranzas thead th:nth-child(1),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(1) { width: 8%; min-width: 0 !important; }
+    #cobranzas .tabla-cobranzas thead th:nth-child(2),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(2) { width: 7%; min-width: 0 !important; }
+    #cobranzas .tabla-cobranzas thead th:nth-child(3),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(3) { width: 6%; min-width: 0 !important; }
+    #cobranzas .tabla-cobranzas thead th:nth-child(4),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(4) { width: 9%; min-width: 0 !important; }
+    #cobranzas .tabla-cobranzas thead th:nth-child(5),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(5) { width: 24%; min-width: 0 !important; }
+    #cobranzas .tabla-cobranzas thead th:nth-child(6),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(6) { width: 6%; min-width: 0 !important; }
+    #cobranzas .tabla-cobranzas thead th:nth-child(7),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(7) { width: 6%; min-width: 0 !important; }
+    #cobranzas .tabla-cobranzas thead th:nth-child(8),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(8) { width: 11%; min-width: 0 !important; }
+    #cobranzas .tabla-cobranzas thead th:nth-child(9),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(9) { width: 11%; min-width: 0 !important; }
+    #cobranzas .tabla-cobranzas thead th:nth-child(10),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(10) { width: 6%; min-width: 0 !important; text-align: right; }
+    #cobranzas .tabla-cobranzas thead th:nth-child(11),
+    #cobranzas .tabla-cobranzas tbody td:nth-child(11) { width: 6%; min-width: 0 !important; text-align: right; }
+    /* Ajuste de quiebre en Nombre Cliente solamente en el cuerpo */
+    #cobranzas .tabla-cobranzas tbody td:nth-child(5) { overflow-wrap: anywhere; }
+}
 body {
     font-family: Arial, sans-serif;
     background: #f7f7f7;
@@ -191,6 +230,8 @@ nav {
     margin: 6px 10px;
     position: relative;
 }
+/* Empujar elementos a la derecha en la barra */
+.menu li.push-right { margin-left: auto; }
 .menu a {
     color: #fff;
     text-decoration: none;
@@ -199,6 +240,9 @@ nav {
     padding: 12px 10px;
     white-space: nowrap;
 }
+.menu a.is-enabled { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; }
+.menu a.is-disabled { opacity: .45; cursor: not-allowed; filter: grayscale(35%); }
+.menu #user-info a { font-weight: 600; opacity: .95; }
 .menu a:hover {
     text-decoration: underline;
 }
@@ -217,9 +261,15 @@ nav {
     z-index: 50;
 }
 .menu li.has-submenu:hover > .submenu { display: block; }
+/* Mostrar submenu también al hacer click (clase .open se maneja por JS) */
+.menu li.has-submenu.open > .submenu { display: block; }
+.menu li.has-submenu > a.submenu-toggle { cursor: pointer; }
 .menu .submenu li { margin: 0; }
 .menu .submenu a { color: #333; padding: 8px 12px; display: block; }
 .menu .submenu a:hover { background: #f1f5ff; text-decoration: none; }
+.menu .submenu a.is-enabled { font-weight: 600; }
+.menu .submenu a.is-disabled { color: #9aa0a6; cursor: not-allowed; opacity: .6; }
+.menu .submenu a.is-disabled:hover { background: transparent; text-decoration: none; }
 .container {
     max-width: 1100px;
     margin: 40px auto;
@@ -244,6 +294,19 @@ h2 {
 /* Iconos en menú principal */
 .menu a .nav-icon { display:inline-flex; width:16px; height:16px; margin-right:8px; vertical-align:middle; }
 .menu a .nav-icon svg { width:16px; height:16px; fill:#fff; stroke:#fff; }
+/* Caret del submenu */
+.menu li.has-submenu > a .caret { display:inline-flex; width:14px; height:14px; margin-left:6px; vertical-align:middle; transition: transform .2s ease; }
+.menu li.has-submenu > a .caret svg { width:14px; height:14px; fill:none; stroke:#fff; }
+/* Rotar cuando está abierto o en hover (dispositivos con hover) */
+.menu li.has-submenu.open > a .caret { transform: rotate(180deg); }
+@media (hover: hover) {
+    .menu li.has-submenu:hover > a .caret { transform: rotate(180deg); }
+}
+
+/* Submenú deshabilitado (cuando todos sus hijos lo están) */
+.menu li.has-submenu.disabled > a { opacity: .45; cursor: not-allowed; filter: grayscale(35%); }
+.menu li.has-submenu.disabled:hover > .submenu { display: none; }
+.menu li.has-submenu.disabled.open > .submenu { display: none; }
 
 /* Marca RikFlex */
 .brand-logo {
@@ -304,6 +367,14 @@ th, td {
 th {
     background: #f2f2f2;
 }
+
+/* Estilo específico para tablas de Cobranzas: sin líneas, encabezado más fuerte */
+.tabla-cobranzas { border-collapse: separate; border-spacing: 0 6px; margin-top: 18px; }
+.tabla-cobranzas th, .tabla-cobranzas td { border: none !important; background: transparent; }
+.tabla-cobranzas thead th { font-weight: 800; color: #23354d; padding-top: 2px; padding-bottom: 10px; background: transparent !important; }
+.tabla-cobranzas tbody tr td { padding: 10px 8px; }
+.tabla-cobranzas tbody tr:hover td { background: #f7fbff; }
+.tabla-cobranzas tbody tr td:last-child, .tabla-cobranzas thead th:last-child { text-align: right; }
 
 /* Barra de avance en resumen */
 .progress { width: 120px; height: 10px; background: #eee; border-radius: 6px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }

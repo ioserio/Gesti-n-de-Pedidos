@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/require_login.php';
 // devoluciones_resumen.php
 // Muestra un listado de devoluciones por fecha con filtros opcionales
 ini_set('display_errors', 1);

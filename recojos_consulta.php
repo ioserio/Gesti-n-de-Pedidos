@@ -2,6 +2,7 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+require_once __DIR__ . '/require_login.php';
 
 require_once __DIR__ . '/conexion.php';
 
@@ -112,11 +113,13 @@ foreach ($rows as $r) {
     $cant = (int)$r['cantidad'];
     $veh = trim((string)$r['vehiculo']);
     if ($veh === '') $veh = 'SIN VEHICULO';
-    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0];
+    // Incluir todos los estados usados en Gestión (agregamos 'No digitado')
+    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'No digitado'=>0];
     if (isset($estadosMap[$id])) {
         foreach ($estadosMap[$id] as $st => $c) { if (isset($counts[$st])) $counts[$st] = (int)$c; }
     }
-    $asignados = $counts['OK'] + $counts['No llego al almacen'] + $counts['Sin compra'] + $counts['No autorizado'];
+    // Considerar 'No digitado' como estado asignado (no debe contarse como pendiente)
+    $asignados = $counts['OK'] + $counts['No llego al almacen'] + $counts['Sin compra'] + $counts['No autorizado'] + $counts['No digitado'];
     $restan = max(0, $cant - $asignados);
     $restanOk = max(0, $cant - $counts['OK']); // unidades que aún NO están en OK
     // Si filtramos pendientes, sólo mostrar items donde todavía faltan OK
@@ -131,6 +134,7 @@ foreach ($rows as $r) {
     if ($counts['Sin compra'] > 0) $lineas[] = ['estado' => 'Sin compra', 'cantidad' => $counts['Sin compra']];
     if ($counts['No llego al almacen'] > 0) $lineas[] = ['estado' => 'No llego al almacen', 'cantidad' => $counts['No llego al almacen']];
     if ($counts['No autorizado'] > 0) $lineas[] = ['estado' => 'No autorizado', 'cantidad' => $counts['No autorizado']];
+    if ($counts['No digitado'] > 0) $lineas[] = ['estado' => 'No digitado', 'cantidad' => $counts['No digitado']];
     if ($restan > 0) $lineas[] = ['estado' => 'Pendientes', 'cantidad' => $restan];
 
     if (empty($lineas)) {

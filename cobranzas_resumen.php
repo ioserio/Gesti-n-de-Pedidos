@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/require_login.php';
 // Resumen de cobranzas por vendedor (responsable)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -40,12 +41,13 @@ if ($cod_vendedor !== '') {
     $sum_total = 0.0; $sum_saldo = 0.0; $cnt = 0;
     foreach ($rows as $r) { $sum_total += (float)$r['total']; $sum_saldo += (float)$r['saldo']; $cnt++; }
 
-    echo '<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px;">';
-    echo '<div><b>Vendedor:</b> ' . htmlspecialchars($cod_vendedor) . ' &nbsp; <b>Documentos:</b> ' . number_format($cnt,0,'.',',') . '</div>';
-    echo '<div><b>Total S/:</b> ' . number_format($sum_total,2,'.',',') . ' &nbsp; <b>Saldo S/:</b> ' . number_format($sum_saldo,2,'.',',') . '</div>';
-    echo '</div>';
+   echo '<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px;">';
+   echo '<div><b>Vendedor:</b> ' . htmlspecialchars($cod_vendedor) . ' &nbsp; <b>Documentos:</b> ' . number_format($cnt,0,'.',',') . '</div>';
+   echo '<div><b>Total S/:</b> ' . number_format($sum_total,2,'.',',') . ' &nbsp; <b>Saldo S/:</b> ' . number_format($sum_saldo,2,'.',',') . '</div>';
+   echo '<div style="margin-left:auto"><button type="button" class="btn-print" onclick="window.print()">Imprimir</button></div>';
+   echo '</div>';
 
-    echo '<table>';
+   echo '<table class="tabla-cobranzas">';
    echo '<thead><tr>'
        . '<th style="min-width:110px">Fecha</th>'
        . '<th style="min-width:80px">Vendedor</th>'
@@ -149,9 +151,10 @@ foreach ($rows as $r) { $total_global += (int)$r['total_documentos']; }
 
 echo '<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px;">';
 echo '<div><b>Total documentos:</b> ' . number_format($total_global, 0, '.', ',') . '</div>';
+echo '<div style="margin-left:auto"><button type="button" class="btn-print" onclick="window.print()">Imprimir</button></div>';
 echo '</div>';
 
-echo '<table>';
+echo '<table class="tabla-cobranzas">';
 echo '<thead><tr>'
    . '<th style="min-width:90px">Cod Vendedor</th>'
    . '<th>Nombre</th>'

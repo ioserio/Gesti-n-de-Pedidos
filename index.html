@@ -9,25 +9,69 @@
 <body>
     <header>
         <nav>
-            <a href="index.html" class="brand-logo" aria-label="RikFlex Home">RikFlex</a>
+            <a href="index.php" class="brand-logo" aria-label="RikFlex Home">RikFlex</a>
             <ul class="menu">
-                <li><a href="#" onclick="mostrarModulo('subir')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l4 4h-3v6h-2V7H8l4-4z"/><path d="M4 14h16v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/></svg></span>Importar</a></li>
-                <li><a href="#" onclick="mostrarModulo('consultar')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"/></svg></span>Consultar por Vendedor</a></li>
-                <li><a href="#" onclick="mostrarModulo('resumen')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="10" width="4" height="10" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span>Resumen de Pedidos</a></li>
-                <li><a href="#" onclick="mostrarModulo('cobranzas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 1a4 4 0 00-4 4v1H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a4 4 0 00-4-4zm-2 5V5a2 2 0 114 0v1h-4z"/></svg></span>Gestión de Cobranzas</a></li>
+                <li><a href="#" data-mod="importar" onclick="mostrarModulo('subir')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l4 4h-3v6h-2V7H8l4-4z"/><path d="M4 14h16v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/></svg></span>Importar</a></li>
+                <!-- Menú desplegable para Resumen de Pedidos -->
                 <li class="has-submenu">
-                    <a href="#" onclick="mostrarModulo('devoluciones')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v4H7l5 5 5-5h-5V5z"/><path d="M5 19h14v-2H5v2z"/></svg></span>Gestión de Devoluciones</a>
+                    <a href="#" class="submenu-toggle" aria-haspopup="true" aria-expanded="false">
+                        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="10" width="4" height="10" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span>
+                        Pedidos
+                        <span class="caret" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </a>
                     <ul class="submenu">
-                        <li><a href="#" onclick="mostrarModulo('devoluciones')">Clasificaciones</a></li>
-                        <li><a href="#" onclick="mostrarModulo('recojos')">Consulta de Recojos</a></li>
+                        <li>
+                            <a href="#" data-mod="consultar" onclick="mostrarModulo('consultar')">
+                                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"/></svg></span>
+                                Consulta por vd
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" data-mod="resumen" onclick="mostrarModulo('resumen')">
+                                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="10" width="4" height="10" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span>
+                                Resumen de Pedidos
+                            </a>
+                        </li>
                     </ul>
                 </li>
-                <li><a href="#" onclick="mostrarModulo('admin')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19.14 12.94a7.46 7.46 0 000-1.88l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.6-.22l-2.39.96a7.52 7.52 0 00-1.63-.95L14.5 1.9a.5.5 0 00-.49-.4h-3.99a.5.5 0 00-.49.4l-.36 2.41c-.57.23-1.11.54-1.63.95l-2.39-.96a.5.5 0 00-.6.22L2.64 8.35a.5.5 0 00.12.64l2.03 1.58c-.05.31-.08.63-.08.94s.03.63.08.94L2.76 14.03a.5.5 0 00-.12.64l1.92 3.32c.14.24.44.34.7.22l2.39-.96c.51.41 1.06.73 1.63.95l.36 2.41c.06.24.26.4.49.4h3.99c.23 0 .43-.16.49-.4l.36-2.41c.57-.23 1.11-.54 1.63-.95l2.39.96c.26.11.56.01.7-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1112 8a3.5 3.5 0 010 7.5z"/></svg></span>Administrador</a></li>
+                <li><a href="#" data-mod="cobranzas" onclick="mostrarModulo('cobranzas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 1a4 4 0 00-4 4v1H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a4 4 0 00-4-4zm-2 5V5a2 2 0 114 0v1h-4z"/></svg></span>Gestión de Cobranzas</a></li>
+                <li class="has-submenu">
+                    <a href="#" class="submenu-toggle" aria-haspopup="true" aria-expanded="false">
+                        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v4H7l5 5 5-5h-5V5z"/><path d="M5 19h14v-2H5v2z"/></svg></span>
+                        Gestión de Devoluciones
+                        <span class="caret" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </a>
+                    <ul class="submenu">
+                        <li><a href="#" data-mod="devoluciones" onclick="mostrarModulo('devoluciones')">Clasificaciones</a></li>
+                        <li><a href="#" data-mod="recojos" onclick="mostrarModulo('recojos')">Consulta de Recojos</a></li>
+                    </ul>
+                </li>
+                <li class="has-submenu">
+                    <a href="#" class="submenu-toggle" aria-haspopup="true" aria-expanded="false">
+                        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19.14 12.94a7.46 7.46 0 000-1.88l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.6-.22l-2.39.96a7.52 7.52 0 00-1.63-.95L14.5 1.9a.5.5 0 00-.49-.4h-3.99a.5.5 0 00-.49.4l-.36 2.41c-.57.23-1.11.54-1.63.95l-2.39-.96a.5.5 0 00-.6.22L2.64 8.35a.5.5 0 00.12.64l2.03 1.58c-.05.31-.08.63-.08.94s.03.63.08.94L2.76 14.03a.5.5 0 00-.12.64l1.92 3.32c.14.24.44.34.7.22l2.39-.96c.51.41 1.06.73 1.63.95l.36 2.41c.06.24.26.4.49.4h3.99c.23 0 .43-.16.49-.4l.36-2.41c.57-.23 1.11-.54 1.63-.95l2.39.96c.26.11.56.01.7-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1112 8a3.5 3.5 0 010 7.5z"/></svg></span>
+                        Administrador
+                        <span class="caret" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </a>
+                    <ul class="submenu">
+                        <li><a href="#" data-mod="admin" onclick="mostrarModulo('admin')">Administrador de Cuotas</a></li>
+                        <li><a href="#" data-mod="usuarios" onclick="mostrarModulo('usuarios')">Usuarios</a></li>
+                        <li><a href="#" data-mod="permisos" onclick="mostrarModulo('permisos')">Permisos</a></li>
+                    </ul>
+                </li>
+                <li id="user-info" class="push-right"><a href="#" tabindex="-1" style="opacity:.95; cursor:default;">
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                    <span id="user-name">Cargando...</span>
+                </a></li>
+                <li><a href="logout.php"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 17v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-6a2 2 0 0 0-2 2v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 12H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Salir</a></li>
             </ul>
         </nav>
     </header>
     <div class="container">
-    <section id="modulo-subir">
+    <section id="modulo-inicio">
+        <h2>Bienvenido</h2>
+        <p>Selecciona un módulo desde el menú superior para comenzar. Si no ves algún módulo, puede que tu usuario no tenga permisos para acceder a él.</p>
+    </section>
+    <section id="modulo-subir" style="display:none;">
         <h2>Subir archivo Excel de Pedidos</h2>
         <form action="procesar_excel.php" method="post" enctype="multipart/form-data">
             <input type="file" name="archivo_excel" accept=".xlsx,.xls" required>
@@ -122,6 +166,36 @@
             <button type="submit">Guardar Cuota</button>
         </form>
         <div id="lista-cuotas"></div>
+    </section>
+    <section id="modulo-usuarios" style="display:none;">
+        <h2>Usuarios</h2>
+        <form id="form-usuario-new" style="margin-bottom:12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <label>Usuario: <input type="text" id="u_usuario" name="usuario" required style="width:140px;"></label>
+            <label>Nombre: <input type="text" id="u_nombre" name="nombre" required style="min-width:200px;"></label>
+            <label>Rol:
+                <select id="u_rol" name="rol">
+                    <option value="USER">USER</option>
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="ADMINISTRADOR">ADMINISTRADOR</option>
+                    <option value="CUENTACORRIENTE">CUENTACORRIENTE</option>
+                    <option value="SUPERVISOR">SUPERVISOR</option>
+                    <option value="FACTURADOR">FACTURADOR</option>
+                </select>
+            </label>
+            <label>Activo: <input type="checkbox" id="u_activo" name="activo" checked></label>
+            <label>Contraseña: <input type="password" id="u_password" name="password" required style="width:160px;"></label>
+            <button type="submit">Crear usuario</button>
+        </form>
+        <div id="lista-usuarios"></div>
+    </section>
+    <section id="modulo-permisos" style="display:none;">
+        <h2>Permisos</h2>
+        <p style="margin-bottom:10px; color:#555;">Módulo de administración de permisos. Aquí podrás asignar permisos por usuario/rol. (Borrador)</p>
+        <div class="msg-ok" style="display:none;" id="perm-ok"></div>
+        <div class="msg-err" style="display:none;" id="perm-err"></div>
+        <div id="perm-content">
+            <p>Pronto: listado de usuarios y acciones permitidas.</p>
+        </div>
     </section>
     <section id="modulo-devoluciones" style="display:none;">
         <h2>Gestión de Devoluciones</h2>

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/require_login.php';
 // procesar_devoluciones.php
 // Sube el Excel DEVOLUCIONES POR CLIENTE.xlsx y carga datos en la tabla devoluciones_por_cliente
 

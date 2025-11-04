@@ -39,6 +39,33 @@ function setFechaHoyResumen() {
 
 // Mostrar módulo y cargar resumen automáticamente
 window.mostrarModulo = function(modulo) {
+    // Validar permisos por módulo si están disponibles
+    try {
+        const map = {
+            'subir':'importar',
+            'consultar':'consultar',
+            'resumen':'resumen',
+            'cobranzas':'cobranzas',
+            'devoluciones':'devoluciones',
+            'recojos':'recojos',
+            'admin':'admin',
+            'usuarios':'usuarios',
+            'permisos':'permisos',
+            'inicio': null
+        };
+        if (modulo && map.hasOwnProperty(modulo) && map[modulo]) {
+            if (window.__PERMS && window.__PERMS[ map[modulo] ] === false) {
+                // Módulo bloqueado: mostrar Inicio y salir
+                const inicio = document.getElementById('modulo-inicio');
+                if (inicio) inicio.style.display = 'block';
+                const ids = ['modulo-subir','modulo-consultar','modulo-resumen','modulo-cobranzas','modulo-admin','modulo-usuarios','modulo-permisos','modulo-devoluciones','modulo-recojos'];
+                ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display='none'; });
+                return;
+            }
+        }
+    } catch(_){}
+    const inicio = document.getElementById('modulo-inicio');
+    if (inicio) inicio.style.display = (modulo === 'inicio') ? 'block' : 'none';
     document.getElementById('modulo-subir').style.display = (modulo === 'subir') ? 'block' : 'none';
     document.getElementById('modulo-consultar').style.display = (modulo === 'consultar') ? 'block' : 'none';
     document.getElementById('modulo-resumen').style.display = (modulo === 'resumen') ? 'block' : 'none';
@@ -52,6 +79,10 @@ window.mostrarModulo = function(modulo) {
     }
     const admin = document.getElementById('modulo-admin');
     if (admin) admin.style.display = (modulo === 'admin') ? 'block' : 'none';
+        const usuarios = document.getElementById('modulo-usuarios');
+        if (usuarios) usuarios.style.display = (modulo === 'usuarios') ? 'block' : 'none';
+        const permisos = document.getElementById('modulo-permisos');
+        if (permisos) permisos.style.display = (modulo === 'permisos') ? 'block' : 'none';
         const devol = document.getElementById('modulo-devoluciones');
         if (devol) devol.style.display = (modulo === 'devoluciones') ? 'block' : 'none';
         const recojos = document.getElementById('modulo-recojos');
@@ -89,6 +120,10 @@ window.mostrarModulo = function(modulo) {
                 const cont = document.getElementById('cobranzas');
                 if (cont) cont.innerHTML = '<p>Ingrese el Vendedor y presione Consultar, o deje vacío para ver todos.</p>';
             }, 50);
+        } else if (modulo === 'permisos') {
+            setTimeout(function(){ cargarPermisos(); }, 50);
+        } else if (modulo === 'usuarios') {
+            setTimeout(function(){ cargarUsuarios(); }, 50);
     }
 }
 
@@ -141,8 +176,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-    // Mostrar por defecto el módulo de subir
-    window.mostrarModulo('subir');
+    // Mostrar por defecto una pantalla de inicio (no cargar ningún módulo protegido)
+    window.mostrarModulo('inicio');
     // Admin: listeners
     const formCuota = document.getElementById('form-cuota');
     if (formCuota) {
@@ -684,6 +719,37 @@ function cargarCobranzas(){
 }
 
 document.addEventListener('DOMContentLoaded', function(){
+    // Chequeo ligero de sesión en cliente; si no hay sesión, redirige a login
+    fetch('auth_check.php', { cache: 'no-store' })
+        .then(r => r.json()).then(info => {
+            if (!info || info.authenticated !== true) {
+                const next = encodeURIComponent(location.pathname + location.search);
+                location.href = 'login.php?next=' + next;
+                return;
+            }
+            // Pintar el usuario en el header
+            const tgt = document.getElementById('user-name');
+            if (tgt) {
+                const nom = (info.nombre && info.nombre.trim()) ? info.nombre.trim() : (info.usuario || '');
+                tgt.textContent = nom ? `Hola, ${nom}` : '';
+            }
+            // Guardar id de usuario actual globalmente
+            window.__CURRENT_USER_ID = info.id || 0;
+            // Cargar permisos del usuario y ocultar menús no permitidos
+            try {
+                fetch('permisos_api.php?action=my', { cache:'no-store' })
+                    .then(r => r.json())
+                    .then(p => {
+                        if (!p || p.ok !== true) return;
+                        const perms = p.permisos || {};
+                        // Guardar globalmente para validar accesos cuando se invoca mostrarModulo
+                        window.__PERMS = perms;
+                        applyPermissionStyles(perms);
+                    })
+                    .catch(()=>{});
+            } catch(_){}
+        }).catch(() => {});
+
     const formC = document.getElementById('form-cobranzas');
     if (formC) {
         formC.addEventListener('submit', function(e){ e.preventDefault(); cargarCobranzas(); });
@@ -749,3 +815,294 @@ function cargarCuotas(){
         .then(html => { cont.innerHTML = html; })
         .catch(()=>{ cont.innerHTML = '<p>Error al cargar cuotas</p>'; });
 }
+
+// Permisos: listado y toggle
+function cargarPermisos(){
+    const cont = document.getElementById('perm-content');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando permisos...</p>';
+    fetch('permisos_api.php?action=list')
+        .then(r => {
+            if (!r.ok) return r.text().then(t=>{ throw new Error(t||('HTTP '+r.status)); });
+            return r.text();
+        })
+        .then(html => {
+            cont.innerHTML = html;
+        })
+        .catch(err => { cont.innerHTML = '<p>Error al cargar permisos: ' + (err.message||'') + '</p>'; });
+}
+
+// Delegación de cambios de check en permisos
+document.addEventListener('click', function(e){
+    const chk = e.target.closest('input.perm-toggle[type="checkbox"]');
+    if (!chk) return;
+    const uid = parseInt(chk.getAttribute('data-uid')||'0', 10) || 0;
+    const mod = chk.getAttribute('data-mod')||'';
+    const val = chk.checked ? 1 : 0;
+    const fd = new FormData();
+    fd.append('action','toggle'); fd.append('user_id', String(uid)); fd.append('modulo', mod); fd.append('value', String(val));
+    fetch('permisos_api.php', { method:'POST', body: fd })
+        .then(r => r.json())
+        .then(res => {
+            if (!res || res.ok !== true) throw new Error(res && res.error ? res.error : 'Error');
+            // Si editamos permisos del usuario actual, reflejar en menú al instante
+            try {
+                const currentId = window.__CURRENT_USER_ID || 0;
+                if (currentId && currentId === uid) {
+                    const anchors = document.querySelectorAll('a[data-mod="'+mod+'"]');
+                    anchors.forEach(a => {
+                        const allowed = !!val;
+                        a.classList.toggle('is-enabled', allowed);
+                        a.classList.toggle('is-disabled', !allowed);
+                        if (!allowed) { a.setAttribute('aria-disabled','true'); a.title='Sin permiso'; }
+                        else { a.removeAttribute('aria-disabled'); a.removeAttribute('title'); }
+                    });
+                    // Actualizar cache de permisos
+                    if (!window.__PERMS) window.__PERMS = {};
+                    window.__PERMS[mod] = !!val;
+                    // Recalcular padres
+                    recomputeParentDropdownStates();
+                }
+            } catch(_){}
+            // feedback sutil
+            const msg = document.createElement('span');
+            msg.textContent = ' Guardado';
+            msg.style.marginLeft = '6px'; msg.style.color = '#198754'; msg.style.fontSize = '12px';
+            chk.insertAdjacentElement('afterend', msg);
+            setTimeout(()=>{ msg.remove(); }, 1200);
+        })
+        .catch(err => {
+            alert('No se pudo guardar el permiso: ' + (err.message||''));
+            // revertir
+            chk.checked = !val;
+        });
+});
+
+// Guardado masivo de permisos por fila
+document.addEventListener('click', function(e){
+    const btn = e.target.closest('button.perm-bulk-save');
+    if (!btn) return;
+    const uid = parseInt(btn.getAttribute('data-uid')||'0', 10) || 0;
+    const tr = btn.closest('tr');
+    if (!tr) return;
+    // Recolectar estados de todos los checkboxes en la fila
+    const mods = {};
+    tr.querySelectorAll('input.perm-toggle[type="checkbox"]').forEach(ch => {
+        const m = ch.getAttribute('data-mod')||'';
+        if (m) mods[m] = ch.checked ? 1 : 0;
+    });
+    btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Guardando...';
+    const fd = new FormData();
+    fd.append('action','bulk'); fd.append('user_id', String(uid)); fd.append('mods', JSON.stringify(mods));
+    fetch('permisos_api.php', { method:'POST', body: fd })
+        .then(r => r.json())
+        .then(res => {
+            if (!res || res.ok !== true) throw new Error(res && res.error ? res.error : 'Error');
+            btn.textContent = 'Guardado';
+            // Si se guardaron permisos del usuario actual, actualizar el menú completo
+            try {
+                const currentId = window.__CURRENT_USER_ID || 0;
+                if (currentId && currentId === uid) {
+                    document.querySelectorAll('a[data-mod]').forEach(a => {
+                        const modKey = a.getAttribute('data-mod');
+                        const allowed = (mods.hasOwnProperty(modKey)) ? !!mods[modKey] : a.classList.contains('is-enabled');
+                        a.classList.toggle('is-enabled', allowed);
+                        a.classList.toggle('is-disabled', !allowed);
+                        if (!allowed) { a.setAttribute('aria-disabled','true'); a.title='Sin permiso'; }
+                        else { a.removeAttribute('aria-disabled'); a.removeAttribute('title'); }
+                    });
+                    // Actualizar cache global
+                    if (!window.__PERMS) window.__PERMS = {};
+                    Object.keys(mods).forEach(k => { window.__PERMS[k] = !!mods[k]; });
+                    // Recalcular padres
+                    recomputeParentDropdownStates();
+                }
+            } catch(_){}
+        })
+        .catch(err => {
+            alert('No se pudo guardar: ' + (err.message||''));
+        })
+        .finally(() => {
+            setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1200);
+        });
+});
+
+// Toggle de submenús por click (además del hover)
+document.addEventListener('DOMContentLoaded', function(){
+    const nav = document.querySelector('nav');
+    if (!nav) return;
+    const items = Array.from(nav.querySelectorAll('li.has-submenu > a.submenu-toggle'));
+    items.forEach(a => {
+        a.addEventListener('click', function(e){
+            e.preventDefault();
+            const li = a.parentElement;
+            const isOpen = li.classList.contains('open');
+            // Cerrar otros
+            nav.querySelectorAll('li.has-submenu.open').forEach(el => el.classList.remove('open'));
+            // Alternar este
+            li.classList.toggle('open', !isOpen);
+            a.setAttribute('aria-expanded', String(!isOpen));
+        });
+    });
+    // Cerrar al hacer click fuera
+    document.addEventListener('click', function(e){
+        if (!nav.contains(e.target)) {
+            nav.querySelectorAll('li.has-submenu.open').forEach(el => {
+                const toggle = el.querySelector('a.submenu-toggle');
+                if (toggle) toggle.setAttribute('aria-expanded', 'false');
+                el.classList.remove('open');
+            });
+        }
+    });
+    // Cerrar con ESC
+    document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape') {
+            nav.querySelectorAll('li.has-submenu.open').forEach(el => {
+                const toggle = el.querySelector('a.submenu-toggle');
+                if (toggle) toggle.setAttribute('aria-expanded', 'false');
+                el.classList.remove('open');
+            });
+        }
+    });
+});
+
+// Navegar a Inicio al hacer click en el logo (sin recargar)
+document.addEventListener('DOMContentLoaded', function(){
+    const brand = document.querySelector('nav a.brand-logo');
+    if (!brand) return;
+    brand.addEventListener('click', function(e){
+        e.preventDefault();
+        try { window.mostrarModulo('inicio'); } catch(_){ location.href = 'index.php'; }
+    });
+});
+
+// Bloquear navegación a módulos sin permiso
+document.addEventListener('click', function(e){
+    const a = e.target.closest && e.target.closest('a[data-mod].is-disabled');
+    if (!a) return;
+    e.preventDefault();
+    e.stopPropagation();
+});
+
+// También bloquear apertura de submenús cuando el padre está deshabilitado
+document.addEventListener('click', function(e){
+    const a = e.target.closest && e.target.closest('li.has-submenu.disabled > a');
+    if (!a) return;
+    e.preventDefault();
+    e.stopPropagation();
+});
+
+function applyPermissionStyles(perms){
+    // Marcar cada anchor de módulo
+    document.querySelectorAll('a[data-mod]').forEach(a => {
+        const mod = a.getAttribute('data-mod');
+        const allowed = !!perms[mod];
+        a.classList.toggle('is-enabled', allowed);
+        a.classList.toggle('is-disabled', !allowed);
+        if (!allowed) { a.setAttribute('aria-disabled','true'); a.title='Sin permiso'; }
+        else { a.removeAttribute('aria-disabled'); a.removeAttribute('title'); }
+    });
+    // Recalcular estado de los padres con submenú
+    recomputeParentDropdownStates();
+}
+
+function recomputeParentDropdownStates(){
+    document.querySelectorAll('li.has-submenu').forEach(li => {
+        const parentA = li.querySelector(':scope > a');
+        const items = li.querySelectorAll(':scope .submenu a[data-mod]');
+        if (!items || !items.length) return;
+        let anyAllowed = false;
+        items.forEach(a => { if (!a.classList.contains('is-disabled')) anyAllowed = true; });
+        li.classList.toggle('disabled', !anyAllowed);
+        if (parentA) {
+            parentA.classList.toggle('is-disabled', !anyAllowed);
+            parentA.classList.toggle('is-enabled', anyAllowed);
+            if (!anyAllowed) { parentA.setAttribute('aria-disabled','true'); parentA.title='Sin permiso'; }
+            else { parentA.removeAttribute('aria-disabled'); parentA.removeAttribute('title'); }
+        }
+    });
+}
+
+// Usuarios: listar/crear/editar
+function cargarUsuarios(){
+    const cont = document.getElementById('lista-usuarios');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando usuarios...</p>';
+    fetch('users_api.php?action=list')
+        .then(r => {
+            if (!r.ok) return r.text().then(t=>{ throw new Error(t||('HTTP '+r.status)); });
+            return r.text();
+        })
+        .then(html => { cont.innerHTML = html; })
+        .catch(err => { cont.innerHTML = '<p>Error al cargar usuarios: ' + (err.message||'') + '</p>'; });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+    const formNew = document.getElementById('form-usuario-new');
+    if (formNew) {
+        formNew.addEventListener('submit', function(e){
+            e.preventDefault();
+            const fd = new FormData(formNew);
+            fd.append('action','create');
+            // Normalizar checkbox activo
+            if (!fd.has('activo')) fd.append('activo','0');
+            fetch('users_api.php', { method:'POST', body: fd })
+                .then(r => r.json())
+                .then(res => {
+                    if (!res || res.ok !== true) throw new Error(res && res.error ? res.error : 'Error');
+                    // limpiar campos mínimos
+                    formNew.reset();
+                    document.getElementById('u_activo').checked = true;
+                    cargarUsuarios();
+                })
+                .catch(err => {
+                    let msg = 'No se pudo crear';
+                    if (err && err.message === 'DUPLICATE') msg = 'El usuario ya existe';
+                    if (err && err.message === 'REQUIRED') msg = 'Complete usuario y contraseña';
+                    alert(msg);
+                });
+        });
+    }
+    // Delegación de acciones en listado
+    const lista = document.getElementById('lista-usuarios');
+    if (lista) {
+        lista.addEventListener('click', function(e){
+            const tr = e.target.closest('tr[data-id]');
+            if (!tr) return;
+            const id = parseInt(tr.getAttribute('data-id')||'0',10) || 0;
+            if (e.target.closest('.user-save')) {
+                const usuario = tr.querySelector('.u-usuario')?.value.trim() || '';
+                const nombre = tr.querySelector('.u-nombre')?.value.trim() || '';
+                const rol = tr.querySelector('.u-rol')?.value || 'USER';
+                const activo = tr.querySelector('.u-activo')?.checked ? '1' : '0';
+                const fd = new FormData();
+                fd.append('action','update'); fd.append('id', String(id)); fd.append('usuario', usuario); fd.append('nombre', nombre); fd.append('rol', rol); fd.append('activo', activo);
+                fetch('users_api.php', { method:'POST', body: fd })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (!res || res.ok !== true) throw new Error(res && res.error ? res.error : 'Error');
+                        // feedback
+                        const ok = document.createElement('span'); ok.textContent = ' Guardado'; ok.style.color='#198754'; ok.style.marginLeft='6px'; ok.style.fontSize='12px';
+                        e.target.insertAdjacentElement('afterend', ok); setTimeout(()=>ok.remove(), 1200);
+                    })
+                    .catch(err => {
+                        let msg = 'No se pudo guardar';
+                        if (err && err.message === 'DUPLICATE') msg = 'El usuario ya existe';
+                        alert(msg);
+                    });
+            }
+            if (e.target.closest('.user-reset')) {
+                const nuevo = prompt('Nueva contraseña para este usuario:');
+                if (!nuevo) return;
+                const fd = new FormData(); fd.append('action','reset_password'); fd.append('id', String(id)); fd.append('password', nuevo);
+                fetch('users_api.php', { method:'POST', body: fd })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (!res || res.ok !== true) throw new Error('Error');
+                        alert('Contraseña actualizada');
+                    })
+                    .catch(()=>alert('No se pudo actualizar la contraseña'));
+            }
+        });
+    }
+});

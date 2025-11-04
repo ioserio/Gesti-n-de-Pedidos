@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/require_login.php';
 if (!isset($_GET['cod_vendedor']) || empty($_GET['cod_vendedor'])) {
     echo '<p>Debe ingresar un código de vendedor.</p>';
     exit();

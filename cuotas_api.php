@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/require_login.php';
 require_once 'conexion.php';
 
 // Ensure table exists
