@@ -263,6 +263,42 @@ document.addEventListener('DOMContentLoaded', function(){
     // Delegación para guardar formularios por camión
     const cont = document.getElementById('devoluciones');
     if (cont) {
+        // Cache de opciones (vendedores, clientes, productos) por fecha
+        const devOpts = { loadedFor: null, vendedores: [], clientes: [], productos: [], maps: { vend:{}, cli:{}, prod:{} } };
+        async function ensureDevOptions(){
+            const fecha = document.getElementById('fecha_dev')?.value || '';
+            if (!fecha) return devOpts;
+            if (devOpts.loadedFor === fecha && devOpts.vendedores.length) return devOpts;
+            const url = new URL('devoluciones_gestion.php', location.href);
+            url.searchParams.set('action','options');
+            if (fecha) url.searchParams.set('fecha', fecha);
+            const data = await fetch(url.toString()).then(r=>r.json()).catch(()=>null);
+            if (!data || data.ok !== true) return devOpts;
+            devOpts.loadedFor = fecha;
+            devOpts.vendedores = Array.isArray(data.vendedores) ? data.vendedores : [];
+            devOpts.clientes = Array.isArray(data.clientes) ? data.clientes : [];
+            devOpts.productos = Array.isArray(data.productos) ? data.productos : [];
+            // Mapas por código
+            devOpts.maps.vend = Object.fromEntries(devOpts.vendedores.map(v => [String(v.code), v.name||'']));
+            devOpts.maps.cli  = Object.fromEntries(devOpts.clientes.map(c => [String(c.code), c.name||'']));
+            devOpts.maps.prod = Object.fromEntries(devOpts.productos.map(p => [String(p.code), p.name||'']));
+            // Asegurar datalists únicos globales
+            buildDatalistsOnce(devOpts);
+            return devOpts;
+        }
+        function buildDatalistsOnce(opts){
+            function ensureList(id, items){
+                let dl = document.getElementById(id);
+                if (!dl) { dl = document.createElement('datalist'); dl.id = id; document.body.appendChild(dl); }
+                // Render options
+                const html = items.map(it => '<option value="'+String(it.code).replaceAll('"','&quot;')+'">'+(it.name?(' '+String(it.name).replaceAll('<','&lt;')):'')+'</option>').join('');
+                dl.innerHTML = html;
+            }
+            ensureList('dl-vendedores', opts.vendedores);
+            ensureList('dl-clientes', opts.clientes);
+            ensureList('dl-productos', opts.productos);
+        }
+
         // Reconstruye las filas (sub-líneas) de una devolución en la tabla usando los datos del servidor
         function rebuildDevRows(row, devId, data){
             // Obtener columnas fijas desde la fila actual (5 primeras celdas: vendedor, cliente, nombre, cod_prod, producto)
@@ -283,8 +319,9 @@ document.addEventListener('DOMContentLoaded', function(){
             const sc = counts['Sin compra'] || 0;
             const nla = counts['No llego al almacen'] || 0;
             const na = counts['No autorizado'] || 0;
+            const nd = counts['No digitado'] || 0;
             const otros = counts.otros || 0;
-            const asignados = ok + sc + nla + na + otros;
+            const asignados = ok + sc + nla + na + nd + otros;
             const restantes = Math.max(0, (data && data.restantes != null) ? data.restantes : (total - asignados));
 
             function rowHtml(cant, etiqueta, isLast, canUndo){
@@ -305,6 +342,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     + '<option value="No llego al almacen">No llego al almacen</option>'
                     + '<option value="Sin compra">Sin compra</option>'
                     + '<option value="No autorizado">No autorizado</option>'
+                    + '<option value="No digitado">No digitado</option>'
                     + '</select>';
                 const form = '<form class="form-bulk" method="post" action="devoluciones_gestion.php" style="margin-top:6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">'
                     + '<input type="hidden" name="action" value="add_bulk">'
@@ -333,6 +371,7 @@ document.addEventListener('DOMContentLoaded', function(){
             if (sc > 0) parts.push(['Sin compra', sc]);
             if (nla > 0) parts.push(['No llego al almacen', nla]);
             if (na > 0) parts.push(['No autorizado', na]);
+            if (nd > 0) parts.push(['No digitado', nd]);
             if (otros > 0) parts.push(['Otros', otros]);
             const canUndoInline = (restantes === 0 && asignados > 0);
             parts.forEach((p, idx) => {
@@ -416,6 +455,100 @@ document.addEventListener('DOMContentLoaded', function(){
             }).finally(()=>{
                 setTimeout(()=>{ btn.textContent = origText; btn.disabled = false; }, 1500);
             });
+        });
+        // Click en Add+ por camión: agrega una fila editable para insertar manualmente una devolución
+        cont.addEventListener('click', async function(e){
+            const btnAdd = e.target.closest('.btn-add-line');
+            if (!btnAdd) return;
+            const bloque = btnAdd.closest('.bloque-vehiculo');
+            if (!bloque) return;
+            const vehiculo = btnAdd.getAttribute('data-vehiculo') || '';
+            // Evitar múltiples filas nuevas por bloque
+            if (bloque.querySelector('tr.dev-row-new')) {
+                const first = bloque.querySelector('tr.dev-row-new input');
+                if (first) first.focus();
+                return;
+            }
+            const opts = await ensureDevOptions();
+            const tbody = bloque.querySelector('tbody');
+            if (!tbody) return;
+            const tr = document.createElement('tr');
+            tr.className = 'dev-row dev-row-new';
+            tr.setAttribute('data-vehiculo', vehiculo);
+            tr.innerHTML = ''
+                + '<td><input list="dl-vendedores" class="n-vend" style="width:90px;" placeholder="Cod" /></td>'
+                + '<td><input list="dl-clientes" class="n-cli" style="width:110px;" placeholder="Cod" /></td>'
+                + '<td><input type="text" class="n-cli-nom" style="min-width:220px;" placeholder="Nombre cliente" /></td>'
+                + '<td><input list="dl-productos" class="n-prod" style="width:90px;" placeholder="Cod" /></td>'
+                + '<td><input type="text" class="n-prod-nom" style="min-width:260px;" placeholder="Nombre producto" /></td>'
+                + '<td style="text-align:right;"><input type="number" class="n-cant" min="1" step="1" value="1" style="width:80px; text-align:right;" /></td>'
+                + '<td>'
+                + '  <button type="button" class="btn-save-new">Guardar</button>'
+                + '  <button type="button" class="btn-cancel-new" style="background:#dc3545;color:#fff;border:none;padding:6px 10px;border-radius:4px; margin-left:6px;">Cancelar</button>'
+                + '</td>';
+            tbody.appendChild(tr);
+            // Autorellenar nombres al cambiar códigos
+            const iVend = tr.querySelector('.n-vend');
+            const iCli = tr.querySelector('.n-cli');
+            const iCliNom = tr.querySelector('.n-cli-nom');
+            const iProd = tr.querySelector('.n-prod');
+            const iProdNom = tr.querySelector('.n-prod-nom');
+            iVend?.addEventListener('change', ()=>{}); // reservado por si se requiere validar
+            iCli?.addEventListener('change', ()=>{ const v=iCli.value.trim(); iCliNom.value = opts.maps.cli[v] || iCliNom.value; });
+            iProd?.addEventListener('change', ()=>{ const v=iProd.value.trim(); iProdNom.value = opts.maps.prod[v] || iProdNom.value; });
+            (iVend||{}).focus?.();
+        });
+        // Guardar/Cancelar nueva fila
+        cont.addEventListener('click', function(e){
+            const btnCancel = e.target.closest('.btn-cancel-new');
+            if (btnCancel) {
+                const tr = btnCancel.closest('tr.dev-row-new');
+                if (tr) tr.remove();
+                return;
+            }
+            const btnSave = e.target.closest('.btn-save-new');
+            if (!btnSave) return;
+            const tr = btnSave.closest('tr.dev-row-new');
+            if (!tr) return;
+            const vehiculo = tr.getAttribute('data-vehiculo') || '';
+            const fecha = document.getElementById('fecha_dev')?.value || '';
+            const codVend = tr.querySelector('.n-vend')?.value.trim() || '';
+            const codCli = tr.querySelector('.n-cli')?.value.trim() || '';
+            const nomCli = tr.querySelector('.n-cli-nom')?.value.trim() || '';
+            const codProd = tr.querySelector('.n-prod')?.value.trim() || '';
+            const nomProd = tr.querySelector('.n-prod-nom')?.value.trim() || '';
+            const cantidad = parseFloat(tr.querySelector('.n-cant')?.value || '0') || 0;
+            if (!fecha || !codVend || !codCli || !codProd || cantidad <= 0) {
+                alert('Complete código de vendedor, cliente, producto y cantidad > 0.');
+                return;
+            }
+            btnSave.disabled = true; btnSave.textContent = 'Guardando...';
+            const fd = new FormData();
+            fd.append('action','create_manual');
+            fd.append('fecha', fecha);
+            fd.append('vehiculo', vehiculo);
+            fd.append('codigovendedor', codVend);
+            fd.append('nombrevendedor', '');
+            fd.append('codigocliente', codCli);
+            fd.append('nombrecliente', nomCli);
+            fd.append('codigoproducto', codProd);
+            fd.append('nombreproducto', nomProd);
+            fd.append('cantidad', String(cantidad));
+            fetch('devoluciones_gestion.php', { method:'POST', body: fd, headers: { 'Accept': 'application/json' } })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data || data.ok !== true) throw new Error((data && data.message) || 'Error');
+                    // Recargar listado para reflejar la nueva fila
+                    if (typeof cargarDevoluciones === 'function') try { cargarDevoluciones(); } catch(_) {}
+                    if (typeof cargarVehiculos === 'function') try { cargarVehiculos(); } catch(_) {}
+                })
+                .catch(err => {
+                    alert('No se pudo guardar: ' + (err.message||''));
+                })
+                .finally(()=>{
+                    const row = btnSave.closest('tr.dev-row-new');
+                    if (row) row.remove();
+                });
         });
         cont.addEventListener('submit', function(e){
             const formEstados = e.target.closest('form.form-estados');

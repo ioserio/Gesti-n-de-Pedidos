@@ -21,7 +21,7 @@ $createEstado = "CREATE TABLE IF NOT EXISTS `devoluciones_estado` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `devolucion_id` INT UNSIGNED NOT NULL,
     `unidad_index` INT UNSIGNED NOT NULL,
-    `estado` ENUM('OK','No llego al almacen','Sin compra','No autorizado') NOT NULL,
+    `estado` ENUM('OK','No llego al almacen','Sin compra','No autorizado','No digitado') NOT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY `uniq_dev_unit` (`devolucion_id`, `unidad_index`),
     KEY `idx_dev` (`devolucion_id`),
@@ -31,10 +31,108 @@ $createEstado = "CREATE TABLE IF NOT EXISTS `devoluciones_estado` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
 $mysqli->query($createEstado);
 
-// Intentar ajustar el ENUM si la tabla ya existía sin la opción "No autorizado"
-@$mysqli->query("ALTER TABLE `devoluciones_estado` MODIFY COLUMN `estado` ENUM('OK','No llego al almacen','Sin compra','No autorizado') NOT NULL");
+// Intentar ajustar el ENUM si la tabla ya existía sin las opciones nuevas
+@$mysqli->query("ALTER TABLE `devoluciones_estado` MODIFY COLUMN `estado` ENUM('OK','No llego al almacen','Sin compra','No autorizado','No digitado') NOT NULL");
 
 $action = isset($_REQUEST['action']) ? $_REQUEST['action'] : 'view';
+
+// Endpoint: opciones de selección (vendedores, clientes, productos)
+if ($action === 'options' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $fecha = isset($_GET['fecha']) ? trim($_GET['fecha']) : '';
+    // Opcionalmente filtrar por fecha para acotar listas; si no se envía, traer de todo el histórico (limitado)
+    $where = [];
+    $types = '';
+    $params = [];
+    if ($fecha !== '') { $where[] = 'fecha = ?'; $types .= 's'; $params[] = $fecha; }
+    $w = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+    // Helper para consultas distinct con límite prudente
+    $data = ['vendedores'=>[], 'clientes'=>[], 'productos'=>[]];
+    // Vendedores
+    $sqlV = "SELECT DISTINCT codigovendedor, COALESCE(NULLIF(TRIM(nombrevendedor), ''), '') AS nombre FROM devoluciones_por_cliente $w ORDER BY codigovendedor LIMIT 500";
+    $stmtV = $types ? $mysqli->prepare($sqlV) : $mysqli->prepare($sqlV);
+    if ($types) $stmtV->bind_param($types, ...$params);
+    $stmtV->execute();
+    $resV = $stmtV->get_result();
+    while ($r = $resV->fetch_assoc()) { $data['vendedores'][] = ['code'=>$r['codigovendedor'], 'name'=>$r['nombre']]; }
+    $stmtV->close();
+    // Clientes
+    $sqlC = "SELECT DISTINCT codigocliente, COALESCE(NULLIF(TRIM(nombrecliente), ''), '') AS nombre FROM devoluciones_por_cliente $w ORDER BY codigocliente LIMIT 1000";
+    $stmtC = $types ? $mysqli->prepare($sqlC) : $mysqli->prepare($sqlC);
+    if ($types) $stmtC->bind_param($types, ...$params);
+    $stmtC->execute();
+    $resC = $stmtC->get_result();
+    while ($r = $resC->fetch_assoc()) { $data['clientes'][] = ['code'=>$r['codigocliente'], 'name'=>$r['nombre']]; }
+    $stmtC->close();
+    // Productos
+    $sqlP = "SELECT DISTINCT codigoproducto, COALESCE(NULLIF(TRIM(nombreproducto), ''), '') AS nombre FROM devoluciones_por_cliente $w ORDER BY codigoproducto LIMIT 1000";
+    $stmtP = $types ? $mysqli->prepare($sqlP) : $mysqli->prepare($sqlP);
+    if ($types) $stmtP->bind_param($types, ...$params);
+    $stmtP->execute();
+    $resP = $stmtP->get_result();
+    while ($r = $resP->fetch_assoc()) { $data['productos'][] = ['code'=>$r['codigoproducto'], 'name'=>$r['nombre']]; }
+    $stmtP->close();
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok'=>true] + $data);
+    exit;
+}
+
+// Endpoint: crear manualmente una línea de devolución dentro de un camión
+if ($action === 'create_manual' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $fecha = isset($_POST['fecha']) ? trim($_POST['fecha']) : '';
+    $vehiculo = isset($_POST['vehiculo']) ? trim($_POST['vehiculo']) : '';
+    if ($vehiculo === 'SIN VEHICULO') $vehiculo = '';
+    $codVend = isset($_POST['codigovendedor']) ? trim($_POST['codigovendedor']) : '';
+    $nomVend = isset($_POST['nombrevendedor']) ? trim($_POST['nombrevendedor']) : '';
+    $codCli = isset($_POST['codigocliente']) ? trim($_POST['codigocliente']) : '';
+    $nomCli = isset($_POST['nombrecliente']) ? trim($_POST['nombrecliente']) : '';
+    $codProd = isset($_POST['codigoproducto']) ? trim($_POST['codigoproducto']) : '';
+    $nomProd = isset($_POST['nombreproducto']) ? trim($_POST['nombreproducto']) : '';
+    $cantidad = isset($_POST['cantidad']) ? (float)$_POST['cantidad'] : 0;
+
+    if ($fecha === '' || $codVend === '' || $codCli === '' || $codProd === '' || $cantidad <= 0) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok'=>false, 'message'=>'Datos incompletos']);
+        exit;
+    }
+
+    // Completar nombres si no fueron provistos, usando últimos valores conocidos
+    if ($nomVend === '') {
+        $stmt = $mysqli->prepare('SELECT nombrevendedor FROM devoluciones_por_cliente WHERE codigovendedor = ? AND nombrevendedor IS NOT NULL AND nombrevendedor <> "" ORDER BY id DESC LIMIT 1');
+        $stmt->bind_param('s', $codVend);
+        $stmt->execute();
+        $stmt->bind_result($nv); if ($stmt->fetch()) $nomVend = (string)$nv; $stmt->close();
+    }
+    if ($nomCli === '') {
+        $stmt = $mysqli->prepare('SELECT nombrecliente FROM devoluciones_por_cliente WHERE codigocliente = ? AND nombrecliente IS NOT NULL AND nombrecliente <> "" ORDER BY id DESC LIMIT 1');
+        $stmt->bind_param('s', $codCli);
+        $stmt->execute();
+        $stmt->bind_result($nc); if ($stmt->fetch()) $nomCli = (string)$nc; $stmt->close();
+    }
+    if ($nomProd === '') {
+        $stmt = $mysqli->prepare('SELECT nombreproducto FROM devoluciones_por_cliente WHERE codigoproducto = ? AND nombreproducto IS NOT NULL AND nombreproducto <> "" ORDER BY id DESC LIMIT 1');
+        $stmt->bind_param('s', $codProd);
+        $stmt->execute();
+        $stmt->bind_result($np); if ($stmt->fetch()) $nomProd = (string)$np; $stmt->close();
+    }
+
+    $stmtI = $mysqli->prepare('INSERT INTO devoluciones_por_cliente (fecha, codigovendedor, nombrevendedor, codigocliente, nombrecliente, codigoproducto, nombreproducto, cantidad, vehiculo) VALUES (?,?,?,?,?,?,?,?,?)');
+    $stmtI->bind_param('sssssssds', $fecha, $codVend, $nomVend, $codCli, $nomCli, $codProd, $nomProd, $cantidad, $vehiculo);
+    if (!$stmtI->execute()) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok'=>false, 'message'=>'No se pudo insertar: ' . $stmtI->error]);
+        exit;
+    }
+    $newId = $stmtI->insert_id;
+    $stmtI->close();
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok'=>true, 'id'=>$newId]);
+    exit;
+}
 
 if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Guardar estados enviados: estado[devolucion_id][unidad] = valor
@@ -85,7 +183,7 @@ if ($action === 'add_bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $devId = isset($_POST['devolucion_id']) ? (int)$_POST['devolucion_id'] : 0;
     $cantAsignar = isset($_POST['cantidad']) ? (int)$_POST['cantidad'] : 0;
     $estado = isset($_POST['estado']) ? trim($_POST['estado']) : '';
-    $permitidos = ['OK','No llego al almacen','Sin compra','No autorizado'];
+    $permitidos = ['OK','No llego al almacen','Sin compra','No autorizado','No digitado'];
     if (!in_array($estado, $permitidos, true)) { http_response_code(400); echo 'Estado no válido'; exit; }
     if ($devId <= 0 || $cantAsignar <= 0) { http_response_code(400); echo 'Parámetros inválidos'; exit; }
 
@@ -127,7 +225,7 @@ if ($action === 'add_bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtIns->close();
 
     // Recalcular conteos por estado para la devolución
-    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'otros'=>0];
+    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'No digitado'=>0,'otros'=>0];
     $stmtC = $mysqli->prepare('SELECT estado, COUNT(*) c FROM devoluciones_estado WHERE devolucion_id = ? GROUP BY estado');
     $stmtC->bind_param('i', $devId);
     $stmtC->execute();
@@ -185,7 +283,7 @@ if ($action === 'undo_all' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtD->close();
 
     // Tras borrar todo, conteos quedan a cero y restantes = total
-    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'otros'=>0];
+    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'No digitado'=>0,'otros'=>0];
     $asignados = 0;
     $quedan = $cantTotal;
 
@@ -337,6 +435,7 @@ $opciones = [
     'No llego al almacen' => 'No llego al almacen',
     'Sin compra' => 'Sin compra',
     'No autorizado' => 'No autorizado',
+    'No digitado' => 'No digitado',
 ];
 
 ob_start();
@@ -344,8 +443,13 @@ foreach ($porVeh as $vehiculo => $lista) {
     echo '<div class="bloque-vehiculo">';
     echo '<div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">';
     echo '<h3 style="margin:6px 0;">Camión ' . esc($vehiculo) . '</h3>';
+    echo '<div style="display:flex; gap:8px;">';
+    echo '<button type="button" class="btn-add-line" data-vehiculo="' . esc($vehiculo) . '"'
+        . ' title="Agregar una línea manual al camión"'
+        . ' style="background:#0d6efd;color:#fff;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;">Add+</button>';
     echo '<button type="button" class="btn-ok-restantes" data-vehiculo="' . esc($vehiculo) . '"'
         . ' style="background:#198754;color:#fff;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;">OK_Restantes</button>';
+    echo '</div>';
     echo '</div>';
     echo '<table>';
     echo '<thead><tr>'
@@ -356,7 +460,7 @@ foreach ($porVeh as $vehiculo => $lista) {
         $cant = (int)round((float)$r['cantidad']);
         if ($cant < 1) $cant = 1;
         // Resumen de estados ya asignados
-    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'__otros'=>0];
+    $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'No digitado'=>0,'__otros'=>0];
         $asignados = 0;
         if (isset($estadosMap[$id])) {
             foreach ($estadosMap[$id] as $st) {
@@ -373,6 +477,7 @@ foreach ($porVeh as $vehiculo => $lista) {
             'Sin compra' => $counts['Sin compra'],
             'No llego al almacen' => $counts['No llego al almacen'],
             'No autorizado' => $counts['No autorizado'],
+            'No digitado' => $counts['No digitado'],
         ];
         foreach ($clasificaciones as $nombre => $num) {
             if ($num <= 0) continue;
