@@ -13,6 +13,7 @@ $MODULES = [
   'devoluciones'=> 'Gestión de Devoluciones',
   'recojos'     => 'Consulta de Recojos',
   'admin'       => 'Administrador de Cuotas',
+    'rutas'       => 'Rutas',
     'usuarios'    => 'Usuarios',
   'permisos'    => 'Permisos',
 ];

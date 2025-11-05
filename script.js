@@ -49,6 +49,7 @@ window.mostrarModulo = function(modulo) {
             'devoluciones':'devoluciones',
             'recojos':'recojos',
             'admin':'admin',
+            'rutas':'rutas',
             'usuarios':'usuarios',
             'permisos':'permisos',
             'inicio': null
@@ -58,7 +59,7 @@ window.mostrarModulo = function(modulo) {
                 // Módulo bloqueado: mostrar Inicio y salir
                 const inicio = document.getElementById('modulo-inicio');
                 if (inicio) inicio.style.display = 'block';
-                const ids = ['modulo-subir','modulo-consultar','modulo-resumen','modulo-cobranzas','modulo-admin','modulo-usuarios','modulo-permisos','modulo-devoluciones','modulo-recojos'];
+                const ids = ['modulo-subir','modulo-consultar','modulo-resumen','modulo-cobranzas','modulo-admin','modulo-rutas','modulo-usuarios','modulo-permisos','modulo-devoluciones','modulo-recojos'];
                 ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display='none'; });
                 return;
             }
@@ -79,6 +80,8 @@ window.mostrarModulo = function(modulo) {
     }
     const admin = document.getElementById('modulo-admin');
     if (admin) admin.style.display = (modulo === 'admin') ? 'block' : 'none';
+        const rutas = document.getElementById('modulo-rutas');
+        if (rutas) rutas.style.display = (modulo === 'rutas') ? 'block' : 'none';
         const usuarios = document.getElementById('modulo-usuarios');
         if (usuarios) usuarios.style.display = (modulo === 'usuarios') ? 'block' : 'none';
         const permisos = document.getElementById('modulo-permisos');
@@ -120,6 +123,8 @@ window.mostrarModulo = function(modulo) {
                 const cont = document.getElementById('cobranzas');
                 if (cont) cont.innerHTML = '<p>Ingrese el Vendedor y presione Consultar, o deje vacío para ver todos.</p>';
             }, 50);
+        } else if (modulo === 'rutas') {
+            setTimeout(function(){ cargarRutas(); }, 50);
         } else if (modulo === 'permisos') {
             setTimeout(function(){ cargarPermisos(); }, 50);
         } else if (modulo === 'usuarios') {
@@ -816,6 +821,17 @@ function cargarCuotas(){
         .catch(()=>{ cont.innerHTML = '<p>Error al cargar cuotas</p>'; });
 }
 
+// Rutas: cargar listado
+function cargarRutas(){
+    const cont = document.getElementById('lista-rutas');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando rutas...</p>';
+    fetch('rutas_api.php?action=list')
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(()=>{ cont.innerHTML = '<p>Error al cargar rutas</p>'; });
+}
+
 // Permisos: listado y toggle
 function cargarPermisos(){
     const cont = document.getElementById('perm-content');
@@ -1104,5 +1120,34 @@ document.addEventListener('DOMContentLoaded', function(){
                     .catch(()=>alert('No se pudo actualizar la contraseña'));
             }
         });
+    }
+});
+
+// Rutas: listeners de formulario y eliminación
+document.addEventListener('DOMContentLoaded', function(){
+    const formRuta = document.getElementById('form-ruta');
+    if (formRuta) {
+        formRuta.addEventListener('submit', function(e){
+            e.preventDefault();
+            const fd = new FormData(formRuta);
+            fd.append('action','save');
+            fetch('rutas_api.php', { method:'POST', body: fd })
+                .then(r => r.text())
+                .then(html => { const cont = document.getElementById('lista-rutas'); if (cont) cont.innerHTML = html; })
+                .catch(()=>alert('Error al guardar ruta'));
+        });
+        const lista = document.getElementById('lista-rutas');
+        if (lista) {
+            lista.addEventListener('click', function(e){
+                const btn = e.target.closest('button[data-del]');
+                if (!btn) return;
+                const cod = btn.getAttribute('data-cod');
+                const dia = btn.getAttribute('data-dia');
+                fetch(`rutas_api.php?action=delete&cod=${encodeURIComponent(cod)}&dia=${encodeURIComponent(dia)}`)
+                    .then(r => r.text())
+                    .then(html => { this.innerHTML = html; })
+                    .catch(()=>alert('Error al eliminar ruta'));
+            });
+        }
     }
 });

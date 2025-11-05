@@ -7,27 +7,127 @@ error_reporting(E_ALL);
 
 require_once 'conexion.php';
 
+// Helpers: detectar tabla de rutas y obtener rutas del VD para el día de consulta (siguiente día)
+function table_exists(mysqli $mysqli, string $table): bool {
+   $tbl = $mysqli->real_escape_string($table);
+   $sql = "SHOW TABLES LIKE '$tbl'";
+   if ($res = $mysqli->query($sql)) {
+      $exists = ($res->num_rows > 0);
+      $res->close();
+      return $exists;
+   }
+   return false;
+}
+
+function nombre_dia_para_consulta(): array {
+   // Regla: usar el día SIGUIENTE; si hoy es sábado (6), usar LUNES (1).
+   // Nota: si es domingo (7), siguiente es lunes (1) por rotación.
+   $hoy = (int)date('N'); // 1=lunes .. 7=domingo
+   $nombres = [
+      1 => ['lunes','Lunes'],
+      2 => ['martes','Martes'],
+      3 => ['miercoles','Miercoles'], // sin acento por compatibilidad
+      4 => ['jueves','Jueves'],
+      5 => ['viernes','Viernes'],
+      6 => ['sabado','Sabado'],
+      7 => ['domingo','Domingo'],
+   ];
+   if ($hoy === 6) { // sábado -> lunes
+      $next = 1;
+   } else {
+      $next = ($hoy % 7) + 1; // lunes->martes ... domingo->lunes
+   }
+   return [$next, $nombres[$next][0], $nombres[$next][1]];
+}
+
+function get_vendor_routes_today(mysqli $mysqli, string $vd3): array {
+   // Para consistencia con el requerimiento, "hoy" refiere al día de consulta definido arriba (siguiente día)
+   [$dow, $nombreMin, $nombreTitulo] = nombre_dia_para_consulta();
+   $rutas = [];
+
+   // Caso 1: nuestra tabla rutas_vendedor (Cod_Vendedor, Dia_Semana, Zona)
+   if (table_exists($mysqli, 'rutas_vendedor')) {
+      $sql = "SELECT Zona FROM rutas_vendedor WHERE Cod_Vendedor = ? AND Dia_Semana = ?";
+      if ($stmt = $mysqli->prepare($sql)) {
+         $stmt->bind_param('si', $vd3, $dow);
+         $stmt->execute();
+         $res = $stmt->get_result();
+         while ($row = $res->fetch_assoc()) {
+            if (!empty($row['Zona'])) { $rutas[] = trim((string)$row['Zona']); }
+         }
+         $stmt->close();
+      }
+   }
+
+   // Caso 2: tabla del cliente con columnas (VD, NombreDia, Zona)
+   if (empty($rutas) && table_exists($mysqli, 'rutas')) {
+      $sql = "SELECT Zona FROM rutas WHERE VD = ? AND (LOWER(NombreDia) = ? OR NombreDia = ?)";
+      if ($stmt = $mysqli->prepare($sql)) {
+         $lower = $nombreMin; // e.g., 'martes'
+         $titulo = $nombreTitulo; // e.g., 'Martes'
+         $stmt->bind_param('sss', $vd3, $lower, $titulo);
+         $stmt->execute();
+         $res = $stmt->get_result();
+         while ($row = $res->fetch_assoc()) {
+            if (!empty($row['Zona'])) { $rutas[] = trim((string)$row['Zona']); }
+         }
+         $stmt->close();
+      }
+   }
+
+   // Unicas y ordenadas
+   $rutas = array_values(array_unique(array_filter($rutas, fn($z) => $z !== '')));
+   return $rutas;
+}
+
 $cod_vendedor = isset($_GET['cod_vendedor']) ? trim($_GET['cod_vendedor']) : '';
+// Normalizar VD a 3 dígitos para consultas de rutas (e.g., '1' -> '001')
+$vdNorm = str_pad(preg_replace('/\D/','', $cod_vendedor), 3, '0', STR_PAD_LEFT);
 
 // Si hay vendedor: mostrar detalle de documentos con columnas específicas
 if ($cod_vendedor !== '') {
+   // Obtener rutas del VD para el día de consulta (siguiente)
+   $rutasHoy = get_vendor_routes_today($mysqli, $vdNorm);
+
+   // Construir condición por rutas (si no hay rutas, devolverá vacío)
+   $rutaCond = '';
+   if (!empty($rutasHoy)) {
+      $inVals = [];
+      foreach ($rutasHoy as $z) {
+         // Sanitizar cada zona/ruta a valores seguros (alfanumérico, guion y guion bajo)
+         $z = trim((string)$z);
+         if ($z === '') continue;
+         if (!preg_match('/^[0-9A-Za-z_-]+$/', $z)) continue;
+         $inVals[] = "'" . $mysqli->real_escape_string($z) . "'";
+      }
+      if (!empty($inVals)) {
+         $rutaCond = ' AND documentopagozonacodigo IN (' . implode(',', $inVals) . ')';
+      } else {
+         // Si tras sanitizar no quedó ninguna ruta, forzar sin resultados
+         $rutaCond = ' AND 1=0';
+      }
+   } else {
+      // Sin rutas asignadas para hoy => no hay documentos que mostrar
+      $rutaCond = ' AND 1=0';
+   }
+
    $sql = "SELECT 
-            documentopagofechaemision AS fecha,
-            documentopagofechavencimiento AS fechavenc,
-                documentopagoresponsablecodigo AS vendedor,
-                documentopagozonacodigo AS ruta,
-                documentopagopersonacodigo AS codigo_cliente,
-                documentopagopersonanombre AS nombre_cliente,
-                documentopagotipoabreviacion AS tipodoc,
-                documentopagonumero AS numerodoc,
-                documentopagomontosoles AS total,
-                documentopagosaldosoles AS saldo
-            FROM cuentas_por_cobrar_pagar
-            WHERE documentopagoresponsablecodigo = ?
-            ORDER BY documentopagofechaemision DESC, numerodoc ASC";
-    $stmt = $mysqli->prepare($sql);
+         documentopagofechaemision AS fecha,
+         documentopagofechavencimiento AS fechavenc,
+            documentopagoresponsablecodigo AS vendedor,
+            documentopagozonacodigo AS ruta,
+            documentopagopersonacodigo AS codigo_cliente,
+            documentopagopersonanombre AS nombre_cliente,
+            documentopagotipoabreviacion AS tipodoc,
+            documentopagonumero AS numerodoc,
+            documentopagomontosoles AS total,
+            documentopagosaldosoles AS saldo
+         FROM cuentas_por_cobrar_pagar
+         WHERE documentopagoresponsablecodigo = ?" . $rutaCond . "
+         ORDER BY documentopagofechaemision DESC, numerodoc ASC";
+   $stmt = $mysqli->prepare($sql);
     if (!$stmt) { die('<p>Error preparando consulta: ' . htmlspecialchars($mysqli->error) . '</p>'); }
-    $stmt->bind_param('s', $cod_vendedor);
+   $stmt->bind_param('s', $vdNorm);
     $stmt->execute();
     $res = $stmt->get_result();
     $rows = [];
@@ -35,7 +135,7 @@ if ($cod_vendedor !== '') {
     $stmt->close();
     $mysqli->close();
 
-    if (empty($rows)) { echo '<p>No hay documentos para el vendedor especificado.</p>'; exit; }
+   if (empty($rows)) { echo '<p>No hay documentos para el vendedor y rutas asignadas para el día siguiente.</p>'; exit; }
 
     // Totales
     $sum_total = 0.0; $sum_saldo = 0.0; $cnt = 0;
@@ -87,20 +187,22 @@ if ($cod_vendedor !== '') {
          }
       }
 
-      // Calcular DiasVcto = días vencidos contando desde el día siguiente al vencimiento
+      // Calcular DiasVcto = días de morosidad desde la FECHA DE EMISIÓN (inclusive)
       $diasVcto = '-';
       $vctoClass = 'vcto-unk';
-      if ($fv) {
+      if ($fecha) {
          try {
-            $dv = new DateTime($fv);
-            if ($hoy > $dv) {
-               $diasVcto = $dv->diff($hoy)->days; // si hoy es día siguiente, 1
+            $de = new DateTime($fecha);
+            if ($hoy >= $de) {
+               // Inclusivo: el día de emisión cuenta como día 1
+               $diasVcto = $de->diff($hoy)->days + 1;
                // Colorear: 1-7 amarillo, 8-15 naranja, 16+ rojo
                if ($diasVcto >= 16) $vctoClass = 'vcto-red';
                else if ($diasVcto >= 8) $vctoClass = 'vcto-orange';
                else if ($diasVcto >= 1) $vctoClass = 'vcto-yellow';
             } else {
-               $diasVcto = 0; // aún no vencido o vence hoy
+               // Emisión en el futuro (caso atípico)
+               $diasVcto = 0;
                $vctoClass = 'vcto-ok';
             }
          } catch (Exception $e) {
