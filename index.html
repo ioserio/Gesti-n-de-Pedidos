@@ -55,6 +55,7 @@
                     <ul class="submenu">
                         <li><a href="#" data-mod="admin" onclick="mostrarModulo('admin')">Administrador de Cuotas</a></li>
                         <li><a href="#" data-mod="rutas" onclick="mostrarModulo('rutas')">Rutas</a></li>
+                        <li><a href="#" data-mod="ctacte_vendedor" onclick="mostrarModulo('ctacte_vendedor')">CTACTE/Vendedor</a></li>
                         <li><a href="#" data-mod="usuarios" onclick="mostrarModulo('usuarios')">Usuarios</a></li>
                         <li><a href="#" data-mod="permisos" onclick="mostrarModulo('permisos')">Permisos</a></li>
                     </ul>
@@ -141,8 +142,10 @@
     <section id="modulo-cobranzas" style="display:none;">
         <h2>Gestión de Cobranzas</h2>
         <form id="form-cobranzas" style="margin-bottom:15px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-            <label for="vd_cobranza">Vendedor:</label>
-            <input type="text" id="vd_cobranza" name="cod_vendedor" placeholder="Ej: 021" style="width:90px;">
+            <label for="sup_cobranza">Supervisor:</label>
+            <select id="sup_cobranza" style="min-width:220px;"></select>
+            <label for="vd_cobranza_sel" style="margin-left:6px;">Vendedor:</label>
+            <select id="vd_cobranza_sel" name="cod_vendedor" style="min-width:140px;"></select>
             <button type="submit">Consultar</button>
         </form>
         <div id="cobranzas"></div>
@@ -167,6 +170,11 @@
             <button type="submit">Guardar Cuota</button>
         </form>
         <div id="lista-cuotas"></div>
+    </section>
+    <section id="modulo-ctacte-vendedor" style="display:none;">
+        <h2>CTACTE/Vendedor</h2>
+        <p style="margin-bottom:10px;color:#555;">Asigna un supervisor a cada vendedor.</p>
+        <div id="vs-lista"></div>
     </section>
     <section id="modulo-rutas" style="display:none;">
         <h2>Rutas por Vendedor</h2>

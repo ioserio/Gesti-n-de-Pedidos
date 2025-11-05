@@ -14,6 +14,7 @@ $MODULES = [
   'recojos'     => 'Consulta de Recojos',
   'admin'       => 'Administrador de Cuotas',
     'rutas'       => 'Rutas',
+        'ctacte_vendedor' => 'CTACTE/Vendedor',
     'usuarios'    => 'Usuarios',
   'permisos'    => 'Permisos',
 ];

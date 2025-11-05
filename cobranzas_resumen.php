@@ -40,6 +40,21 @@ function nombre_dia_para_consulta(): array {
    return [$next, $nombres[$next][0], $nombres[$next][1]];
 }
 
+// Día presente (hoy), para mostrar en encabezados
+function nombre_dia_hoy(): array {
+   $hoy = (int)date('N'); // 1=lunes .. 7=domingo
+   $nombres = [
+      1 => ['lunes','Lunes'],
+      2 => ['martes','Martes'],
+      3 => ['miercoles','Miercoles'],
+      4 => ['jueves','Jueves'],
+      5 => ['viernes','Viernes'],
+      6 => ['sabado','Sabado'],
+      7 => ['domingo','Domingo'],
+   ];
+   return [$hoy, $nombres[$hoy][0], $nombres[$hoy][1]];
+}
+
 function get_vendor_routes_today(mysqli $mysqli, string $vd3): array {
    // Para consistencia con el requerimiento, "hoy" refiere al día de consulta definido arriba (siguiente día)
    [$dow, $nombreMin, $nombreTitulo] = nombre_dia_para_consulta();
@@ -81,6 +96,7 @@ function get_vendor_routes_today(mysqli $mysqli, string $vd3): array {
 }
 
 $cod_vendedor = isset($_GET['cod_vendedor']) ? trim($_GET['cod_vendedor']) : '';
+$supervisorParam = isset($_GET['supervisor']) ? trim((string)$_GET['supervisor']) : '';
 // Normalizar VD a 3 dígitos para consultas de rutas (e.g., '1' -> '001')
 $vdNorm = str_pad(preg_replace('/\D/','', $cod_vendedor), 3, '0', STR_PAD_LEFT);
 
@@ -132,8 +148,7 @@ if ($cod_vendedor !== '') {
     $res = $stmt->get_result();
     $rows = [];
     while ($r = $res->fetch_assoc()) { $rows[] = $r; }
-    $stmt->close();
-    $mysqli->close();
+   $stmt->close();
 
    if (empty($rows)) { echo '<p>No hay documentos para el vendedor y rutas asignadas para el día siguiente.</p>'; exit; }
 
@@ -141,10 +156,44 @@ if ($cod_vendedor !== '') {
     $sum_total = 0.0; $sum_saldo = 0.0; $cnt = 0;
     foreach ($rows as $r) { $sum_total += (float)$r['total']; $sum_saldo += (float)$r['saldo']; $cnt++; }
 
-   echo '<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px;">';
-   echo '<div><b>Vendedor:</b> ' . htmlspecialchars($cod_vendedor) . ' &nbsp; <b>Documentos:</b> ' . number_format($cnt,0,'.',',') . '</div>';
-   echo '<div><b>Total S/:</b> ' . number_format($sum_total,2,'.',',') . ' &nbsp; <b>Saldo S/:</b> ' . number_format($sum_saldo,2,'.',',') . '</div>';
-   echo '<div style="margin-left:auto"><button type="button" class="btn-print" onclick="window.print()">Imprimir</button></div>';
+   // Encabezado de supervisor centrado si viene por parámetro o puede inferirse por mapeo
+   $supTitulo = '';
+   if ($supervisorParam !== '') {
+      $supTitulo = $supervisorParam;
+   }
+   // No es confiable reabrir la conexión aquí, así que haremos una consulta simple usando la conexión inicial antes de close()
+
+   // Preparar Título centrado: DIA - SUPERVISOR (MAYÚSCULAS)
+   // Mostrar día presente en el encabezado
+   [$dow, $diaMin, $diaTitulo] = nombre_dia_hoy();
+   $diaUp = strtoupper($diaTitulo);
+   $supShown = '';
+   if ($supervisorParam !== '') {
+      $supShown = $supervisorParam;
+   } else {
+      // Intentar obtener supervisor por mapeo
+      $sqlSup = "SELECT s.nombre FROM vendedor_supervisor vs JOIN sup_ctacte s ON s.numero = vs.numero_supervisor WHERE vs.codigo_vendedor = ? LIMIT 1";
+      if ($stmt2 = $mysqli->prepare($sqlSup)) {
+         $stmt2->bind_param('s', $vdNorm);
+         if ($stmt2->execute()) {
+            $rs2 = $stmt2->get_result();
+            if ($r2 = $rs2->fetch_assoc()) { $supShown = (string)$r2['nombre']; }
+         }
+         $stmt2->close();
+      }
+   }
+   // Si nos llegó "1 - ELSA" o similar, quedarnos con el nombre (luego de " - ")
+   if ($supShown && strpos($supShown, ' - ') !== false) {
+      $parts = explode(' - ', $supShown, 2);
+      $supShown = trim($parts[1]);
+   }
+   $supUp = $supShown ? strtoupper($supShown) : '';
+
+   // Barra superior con izquierda (vd/docs), centro (día - supervisor), derecha (totales + imprimir)
+   echo '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">';
+   echo '<div style="min-width:280px;"><b>Vendedor:</b> ' . htmlspecialchars($cod_vendedor) . ' &nbsp; <b>Documentos:</b> ' . number_format($cnt,0,'.',',') . '</div>';
+   echo '<div style="flex:1; text-align:center; font-weight:800; font-size:20px;">' . htmlspecialchars(trim($diaUp . ($supUp?(' - ' . $supUp):'')), ENT_QUOTES, 'UTF-8') . '</div>';
+   echo '<div style="margin-left:auto; display:flex; align-items:center; gap:12px;"><div><b>Total S/:</b> ' . number_format($sum_total,2,'.',',') . ' &nbsp; <b>Saldo S/:</b> ' . number_format($sum_saldo,2,'.',',') . '</div><button type="button" class="btn-print" onclick="window.print()">Imprimir</button></div>';
    echo '</div>';
 
    echo '<table class="tabla-cobranzas">';
@@ -225,7 +274,7 @@ if ($cod_vendedor !== '') {
            . '</tr>';
     }
     echo '</tbody>';
-    echo '</table>';
+   echo '</table>';
     exit;
 }
 
@@ -244,15 +293,26 @@ $res = $stmt->get_result();
 $rows = [];
 while ($r = $res->fetch_assoc()) { $rows[] = $r; }
 $stmt->close();
-$mysqli->close();
 
 if (empty($rows)) { echo '<p>No hay documentos que coincidan con el filtro.</p>'; exit; }
 
 $total_global = 0;
 foreach ($rows as $r) { $total_global += (int)$r['total_documentos']; }
 
-echo '<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px;">';
-echo '<div><b>Total documentos:</b> ' . number_format($total_global, 0, '.', ',') . '</div>';
+// Barra superior para resumen: centro DIA - SUPERVISOR (si viene), izquierda totales, derecha imprimir
+// Mostrar día presente en el encabezado (resumen)
+[$dow, $diaMin, $diaTitulo] = nombre_dia_hoy();
+$diaUp = strtoupper($diaTitulo);
+$supUp = '';
+if ($supervisorParam !== '') {
+   $supShown = $supervisorParam;
+   if (strpos($supShown, ' - ') !== false) { $supShown = trim(explode(' - ', $supShown, 2)[1]); }
+   $supUp = strtoupper($supShown);
+}
+
+echo '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">';
+echo '<div style="min-width:260px;"><b>Total documentos:</b> ' . number_format($total_global, 0, '.', ',') . '</div>';
+echo '<div style="flex:1; text-align:center; font-weight:800; font-size:20px;">' . htmlspecialchars(trim($diaUp . ($supUp?(' - ' . $supUp):'')), ENT_QUOTES, 'UTF-8') . '</div>';
 echo '<div style="margin-left:auto"><button type="button" class="btn-print" onclick="window.print()">Imprimir</button></div>';
 echo '</div>';
 

@@ -50,6 +50,7 @@ window.mostrarModulo = function(modulo) {
             'recojos':'recojos',
             'admin':'admin',
             'rutas':'rutas',
+            'ctacte_vendedor':'ctacte_vendedor',
             'usuarios':'usuarios',
             'permisos':'permisos',
             'inicio': null
@@ -82,6 +83,8 @@ window.mostrarModulo = function(modulo) {
     if (admin) admin.style.display = (modulo === 'admin') ? 'block' : 'none';
         const rutas = document.getElementById('modulo-rutas');
         if (rutas) rutas.style.display = (modulo === 'rutas') ? 'block' : 'none';
+        const vsmod = document.getElementById('modulo-ctacte-vendedor');
+        if (vsmod) vsmod.style.display = (modulo === 'ctacte_vendedor') ? 'block' : 'none';
         const usuarios = document.getElementById('modulo-usuarios');
         if (usuarios) usuarios.style.display = (modulo === 'usuarios') ? 'block' : 'none';
         const permisos = document.getElementById('modulo-permisos');
@@ -125,6 +128,8 @@ window.mostrarModulo = function(modulo) {
             }, 50);
         } else if (modulo === 'rutas') {
             setTimeout(function(){ cargarRutas(); }, 50);
+        } else if (modulo === 'ctacte_vendedor') {
+            setTimeout(function(){ cargarVS(); }, 50);
         } else if (modulo === 'permisos') {
             setTimeout(function(){ cargarPermisos(); }, 50);
         } else if (modulo === 'usuarios') {
@@ -710,10 +715,18 @@ document.addEventListener('DOMContentLoaded', function(){
 function cargarCobranzas(){
     const cont = document.getElementById('cobranzas');
     if (!cont) return;
-    const vd = document.getElementById('vd_cobranza')?.value || '';
+    const vd = document.getElementById('vd_cobranza_sel')?.value || '';
+    const supSel = document.getElementById('sup_cobranza');
+    const supNum = supSel ? (supSel.value || '') : '';
+    let supName = supSel ? (supSel.options[supSel.selectedIndex]?.text || '') : '';
+    if (supName && supName.indexOf(' - ') !== -1) {
+        // Quedarnos solo con el nombre del supervisor (después del número)
+        supName = supName.split(' - ').slice(1).join(' - ').trim();
+    }
     cont.innerHTML = '<p>Cargando...</p>';
     const qs = new URLSearchParams();
     if (vd) qs.append('cod_vendedor', vd);
+    if (supNum && supName) qs.append('supervisor', supName);
     fetch('cobranzas_resumen.php' + (qs.toString() ? ('?' + qs.toString()) : ''))
         .then(r => {
             if (!r.ok) return r.text().then(t=>{ throw new Error(t||('HTTP '+r.status)); });
@@ -758,6 +771,10 @@ document.addEventListener('DOMContentLoaded', function(){
     const formC = document.getElementById('form-cobranzas');
     if (formC) {
         formC.addEventListener('submit', function(e){ e.preventDefault(); cargarCobranzas(); });
+        // Cargar opciones de supervisores y vendedores
+        initCobranzasSelectors();
+        const supSel = document.getElementById('sup_cobranza');
+        if (supSel) supSel.addEventListener('change', function(){ updateVendedoresForSupervisor(); });
     }
 });
 // Consulta AJAX para resumen de pedidos por fecha
@@ -831,6 +848,90 @@ function cargarRutas(){
         .then(html => { cont.innerHTML = html; })
         .catch(()=>{ cont.innerHTML = '<p>Error al cargar rutas</p>'; });
 }
+
+// Cobranzas: cargar supervisores y vendedores
+function initCobranzasSelectors(){
+    const supSel = document.getElementById('sup_cobranza');
+    const vdSel = document.getElementById('vd_cobranza_sel');
+    if (!supSel || !vdSel) return;
+    supSel.innerHTML = '<option value="">Seleccione supervisor...</option>';
+    vdSel.innerHTML = '<option value="">Seleccione vendedor...</option>';
+    fetch('vendedor_supervisor_api.php?action=options')
+        .then(r => r.json())
+        .then(data => {
+            const sups = (data && Array.isArray(data.supervisores)) ? data.supervisores : [];
+            const opts = ['<option value="">Todos</option>'];
+            sups.forEach(s => {
+                const label = (s.numero + ' - ' + (s.nombre||'')).replaceAll('<','&lt;');
+                opts.push('<option value="'+String(s.numero)+'">'+label+'</option>');
+            });
+            supSel.innerHTML = opts.join('');
+        })
+        .catch(()=>{});
+}
+
+function updateVendedoresForSupervisor(){
+    const supSel = document.getElementById('sup_cobranza');
+    const vdSel = document.getElementById('vd_cobranza_sel');
+    if (!supSel || !vdSel) return;
+    const sup = supSel.value || '';
+    vdSel.innerHTML = '<option value="">Cargando vendedores...</option>';
+    const url = new URL('vendedor_supervisor_api.php', location.href);
+    url.searchParams.set('action','options');
+    if (sup) url.searchParams.set('numero_supervisor', sup);
+    fetch(url.toString())
+        .then(r => r.json())
+        .then(data => {
+            const vends = (data && Array.isArray(data.vendedores)) ? data.vendedores : [];
+            const opts = ['<option value="">Todos</option>'];
+            vends.forEach(v => {
+                const label = (v.codigo + ' - ' + (v.nombre||'')).replaceAll('<','&lt;');
+                opts.push('<option value="'+String(v.codigo)+'">'+label+'</option>');
+            });
+            vdSel.innerHTML = opts.join('');
+        })
+        .catch(()=>{ vdSel.innerHTML = '<option value="">Seleccione vendedor...</option>'; });
+}
+
+// CTACTE/Vendedor: cargar listado
+function cargarVS(){
+    const cont = document.getElementById('vs-lista');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando...</p>';
+    fetch('vendedor_supervisor_api.php?action=list')
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(()=>{ cont.innerHTML = '<p>Error al cargar la lista.</p>'; });
+}
+
+// Delegación de eventos: guardar al cambiar el supervisor o quitar
+document.addEventListener('change', function(e){
+    const sel = e.target.closest && e.target.closest('select.sup-select');
+    if (!sel) return;
+    const cod = sel.getAttribute('data-cod') || '';
+    const sup = sel.value || '';
+    const fd = new FormData();
+    fd.append('action','save'); fd.append('codigo_vendedor', cod); fd.append('numero_supervisor', sup);
+    sel.disabled = true;
+    fetch('vendedor_supervisor_api.php', { method:'POST', body: fd })
+        .then(r => r.json())
+        .then(res => { /* feedback sutil */ })
+        .catch(()=>{ alert('No se pudo guardar'); })
+        .finally(()=>{ sel.disabled = false; });
+});
+
+document.addEventListener('click', function(e){
+    const btn = e.target.closest && e.target.closest('button.vs-clear');
+    if (!btn) return;
+    const cod = btn.getAttribute('data-cod') || '';
+    const fd = new FormData(); fd.append('action','save'); fd.append('codigo_vendedor', cod); // sin supervisor -> borrar
+    btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Quitando...';
+    fetch('vendedor_supervisor_api.php', { method:'POST', body: fd })
+        .then(r => r.json())
+        .then(res => { cargarVS(); })
+        .catch(()=>{ alert('No se pudo quitar'); })
+        .finally(()=>{ setTimeout(()=>{ btn.textContent = orig; btn.disabled = false; }, 800); });
+});
 
 // Permisos: listado y toggle
 function cargarPermisos(){
