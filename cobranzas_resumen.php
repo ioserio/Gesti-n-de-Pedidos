@@ -127,6 +127,8 @@ if ($cod_vendedor !== '') {
       $rutaCond = ' AND 1=0';
    }
 
+   // Nuevo criterio: incluir TODOS los documentos en las rutas del vendedor seleccionado,
+   // incluso si pertenecen a otro vendedor. Se prioriza mostrar primero los del vendedor elegido.
    $sql = "SELECT 
          documentopagofechaemision AS fecha,
          documentopagofechavencimiento AS fechavenc,
@@ -139,10 +141,12 @@ if ($cod_vendedor !== '') {
             documentopagomontosoles AS total,
             documentopagosaldosoles AS saldo
          FROM cuentas_por_cobrar_pagar
-         WHERE documentopagoresponsablecodigo = ?" . $rutaCond . "
-         ORDER BY documentopagofechaemision DESC, numerodoc ASC";
+         WHERE 1=1" . $rutaCond . "
+         ORDER BY CASE WHEN documentopagoresponsablecodigo = ? THEN 0 ELSE 1 END,
+                  documentopagofechaemision DESC, numerodoc ASC";
    $stmt = $mysqli->prepare($sql);
     if (!$stmt) { die('<p>Error preparando consulta: ' . htmlspecialchars($mysqli->error) . '</p>'); }
+   // Usamos el vendedor como parámetro solo para ordenar (priorizar sus documentos)
    $stmt->bind_param('s', $vdNorm);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -150,7 +154,7 @@ if ($cod_vendedor !== '') {
     while ($r = $res->fetch_assoc()) { $rows[] = $r; }
    $stmt->close();
 
-   if (empty($rows)) { echo '<p>No hay documentos para el vendedor y rutas asignadas para el día siguiente.</p>'; exit; }
+   if (empty($rows)) { echo '<p>No hay documentos en las rutas asignadas para el día siguiente.</p>'; exit; }
 
     // Totales
     $sum_total = 0.0; $sum_saldo = 0.0; $cnt = 0;
@@ -191,7 +195,7 @@ if ($cod_vendedor !== '') {
 
    // Barra superior con izquierda (vd/docs), centro (día - supervisor), derecha (totales + imprimir)
    echo '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">';
-   echo '<div style="min-width:280px;"><b>Vendedor:</b> ' . htmlspecialchars($cod_vendedor) . ' &nbsp; <b>Documentos:</b> ' . number_format($cnt,0,'.',',') . '</div>';
+   echo '<div style="min-width:280px;"><b>Vendedor:</b> ' . htmlspecialchars($cod_vendedor) . ' &nbsp; <b>Documentos:</b> ' . number_format($cnt,0,'.',',') . '<div style="font-size:11px;color:#555;">Incluye documentos de otros vendedores en las mismas rutas</div></div>';
    echo '<div style="flex:1; text-align:center; font-weight:800; font-size:20px;">' . htmlspecialchars(trim($diaUp . ($supUp?(' - ' . $supUp):'')), ENT_QUOTES, 'UTF-8') . '</div>';
    echo '<div style="margin-left:auto; display:flex; align-items:center; gap:12px;"><div><b>Total S/:</b> ' . number_format($sum_total,2,'.',',') . ' &nbsp; <b>Saldo S/:</b> ' . number_format($sum_saldo,2,'.',',') . '</div><button type="button" class="btn-print" onclick="window.print()">Imprimir</button></div>';
    echo '</div>';
@@ -259,9 +263,14 @@ if ($cod_vendedor !== '') {
             $vctoClass = 'vcto-unk';
          }
       }
+        $esOtroVD = ((string)$r['vendedor'] !== (string)$vdNorm);
         echo '<tr>'
            . '<td>' . htmlspecialchars((string)$fecha) . '</td>'
-           . '<td>' . htmlspecialchars((string)$r['vendedor']) . '</td>'
+           . '<td>'
+              . ($esOtroVD
+                 ? ('<span style="background:#fff7ed;color:#9a3412;border:1px solid #fdba74;padding:2px 6px;border-radius:10px;font-weight:600;" title="Documento de otro vendedor">' . htmlspecialchars((string)$r['vendedor']) . '</span>')
+                 : htmlspecialchars((string)$r['vendedor']))
+           . '</td>'
            . '<td>' . htmlspecialchars((string)$r['ruta']) . '</td>'
            . '<td>' . htmlspecialchars((string)$r['codigo_cliente']) . '</td>'
            . '<td>' . htmlspecialchars((string)$r['nombre_cliente']) . '</td>'
