@@ -73,10 +73,10 @@ window.mostrarModulo = function(modulo) {
     document.getElementById('modulo-resumen').style.display = (modulo === 'resumen') ? 'block' : 'none';
     const cobr = document.getElementById('modulo-cobranzas');
     if (cobr) cobr.style.display = (modulo === 'cobranzas') ? 'block' : 'none';
-    // Alternar modo ancho completo solo para cobranzas
+    // Alternar modo ancho completo para módulos que requieren ocupar todo el ancho (cobranzas y devoluciones)
     const wrap = document.querySelector('.container');
     if (wrap) {
-        if (modulo === 'cobranzas') wrap.classList.add('fullwidth');
+        if (modulo === 'cobranzas' || modulo === 'devoluciones') wrap.classList.add('fullwidth');
         else wrap.classList.remove('fullwidth');
     }
     const admin = document.getElementById('modulo-admin');
@@ -235,7 +235,10 @@ function cargarDevoluciones(){
     if (veh) params.append('vehiculo', veh);
     fetch('devoluciones_gestion.php?' + params.toString())
         .then(r => r.text())
-        .then(html => { cont.innerHTML = html; })
+        .then(html => { 
+            cont.innerHTML = html; 
+            try { enhanceDevolucionesTables(); } catch(_){ }
+        })
         .catch(() => { cont.innerHTML = '<p>Error al consultar devoluciones.</p>'; });
 }
 
@@ -310,10 +313,10 @@ document.addEventListener('DOMContentLoaded', function(){
     if (cont) {
         // Cache de opciones (vendedores, clientes, productos) por fecha
         const devOpts = { loadedFor: null, vendedores: [], clientes: [], productos: [], maps: { vend:{}, cli:{}, prod:{} } };
-        async function ensureDevOptions(){
+        async function ensureDevOptions(forceReload=false){
             const fecha = document.getElementById('fecha_dev')?.value || '';
             if (!fecha) return devOpts;
-            if (devOpts.loadedFor === fecha && devOpts.vendedores.length) return devOpts;
+            if (devOpts.loadedFor === fecha && devOpts.vendedores.length && !forceReload) return devOpts;
             const url = new URL('devoluciones_gestion.php', location.href);
             url.searchParams.set('action','options');
             if (fecha) url.searchParams.set('fecha', fecha);
@@ -442,6 +445,68 @@ document.addEventListener('DOMContentLoaded', function(){
             return t.content.firstChild;
         }
 
+        // Marca encabezados y agrega capacidades de ordenamiento por columna
+        function enhanceDevolucionesTables(){
+            const tables = cont.querySelectorAll('.bloque-vehiculo table');
+            tables.forEach(tbl => {
+                const ths = tbl.querySelectorAll('thead th');
+                ths.forEach((th, idx) => {
+                    // Por ahora, solo hacemos visualmente destacable la columna Nombre Cliente (índice 2)
+                    if (idx === 2) th.classList.add('sortable');
+                });
+            });
+        }
+
+        // Ordena una tabla por columna manteniendo unidas las filas del mismo dev-id
+        function sortTableByColumn(table, colIndex, direction){
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            const allRows = Array.from(tbody.querySelectorAll('tr.dev-row'));
+            // Agrupar filas por devolucion_id
+            const groupsMap = new Map();
+            allRows.forEach(tr => {
+                const id = tr.getAttribute('data-dev-id') || ('__nogroup__' + Math.random());
+                if (!groupsMap.has(id)) groupsMap.set(id, []);
+                groupsMap.get(id).push(tr);
+            });
+            const groups = Array.from(groupsMap.entries()).map(([id, rows]) => {
+                // Clave de orden: texto de la columna en la primera fila del grupo
+                const first = rows[0];
+                const tds = first.querySelectorAll('td');
+                let key = '';
+                if (tds && tds[colIndex]) key = (tds[colIndex].textContent || '').trim();
+                return { id, rows, key };
+            });
+            const dir = (direction === 'desc') ? -1 : 1;
+            groups.sort((a,b) => a.key.toLowerCase().localeCompare(b.key.toLowerCase(), 'es') * dir);
+            // Reinsertar en el nuevo orden
+            const frag = document.createDocumentFragment();
+            groups.forEach(g => g.rows.forEach(tr => frag.appendChild(tr)));
+            tbody.innerHTML = '';
+            tbody.appendChild(frag);
+        }
+
+        // Delegación para clicks en encabezados (thead th)
+        cont.addEventListener('click', function(e){
+            const th = e.target.closest('th');
+            if (!th) return;
+            const table = th.closest('table');
+            if (!table || !table.closest('.bloque-vehiculo')) return;
+            // Índice de la columna
+            const thRow = th.parentElement;
+            const colIndex = Array.prototype.indexOf.call(thRow.children, th);
+            // Solo ordenamos por "Nombre Cliente" (índice 2)
+            if (colIndex !== 2) return;
+            // Alternar dirección
+            const current = th.getAttribute('data-sort-dir') || 'none';
+            const next = current === 'asc' ? 'desc' : 'asc';
+            // Limpiar indicadores en otros th
+            const allTh = table.querySelectorAll('thead th');
+            allTh.forEach(x => x.removeAttribute('data-sort-dir'));
+            th.setAttribute('data-sort-dir', next);
+            sortTableByColumn(table, colIndex, next);
+        });
+
         // Click en OK_Restantes por camión: asigna OK a todas las unidades restantes de cada fila del bloque
         cont.addEventListener('click', function(e){
             const btn = e.target.closest('.btn-ok-restantes');
@@ -468,10 +533,10 @@ document.addEventListener('DOMContentLoaded', function(){
                     const undoBtn = form.querySelector('button[data-undo="1"]');
                     const restantes = parseInt(input?.max || '0', 10) || 0;
                     if (restantes <= 0) continue;
-                    if (msg) { msg.textContent = 'Asignando OK ('+restantes+')...'; msg.className = 'msg-ajax'; }
-                    if (select) select.value = 'OK';
+                    const chosen = (select && select.value) ? select.value : 'OK';
+                    if (msg) { msg.textContent = 'Asignando ' + chosen + ' ('+restantes+')...'; msg.className = 'msg-ajax'; }
                     const fd = new FormData(form);
-                    try { fd.set('action', 'add_bulk'); fd.set('estado','OK'); fd.set('cantidad', String(restantes)); } catch(_) {}
+                    try { fd.set('action', 'add_bulk'); fd.set('estado', chosen); fd.set('cantidad', String(restantes)); } catch(_) {}
                     const data = await fetch('devoluciones_gestion.php', {
                         method: 'POST', body: fd,
                         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
@@ -515,6 +580,9 @@ document.addEventListener('DOMContentLoaded', function(){
                 return;
             }
             const opts = await ensureDevOptions();
+            addNewRowForBlock(bloque, vehiculo, opts);
+        });
+    function addNewRowForBlock(bloque, vehiculo, opts, prefill){
             const tbody = bloque.querySelector('tbody');
             if (!tbody) return;
             const tr = document.createElement('tr');
@@ -538,11 +606,20 @@ document.addEventListener('DOMContentLoaded', function(){
             const iCliNom = tr.querySelector('.n-cli-nom');
             const iProd = tr.querySelector('.n-prod');
             const iProdNom = tr.querySelector('.n-prod-nom');
-            iVend?.addEventListener('change', ()=>{}); // reservado por si se requiere validar
+            iVend?.addEventListener('change', ()=>{});
             iCli?.addEventListener('change', ()=>{ const v=iCli.value.trim(); iCliNom.value = opts.maps.cli[v] || iCliNom.value; });
             iProd?.addEventListener('change', ()=>{ const v=iProd.value.trim(); iProdNom.value = opts.maps.prod[v] || iProdNom.value; });
+            // Prefill si viene provisto (último usado)
+            if (prefill) {
+                if (iVend && prefill.vendCode) iVend.value = prefill.vendCode;
+                if (iCli && prefill.cliCode) iCli.value = prefill.cliCode;
+                if (iCliNom) iCliNom.value = prefill.cliName || (prefill.cliCode ? (opts.maps.cli[prefill.cliCode] || '') : '');
+                // No prefill de producto: dejar en blanco a propósito
+                const qty = tr.querySelector('.n-cant');
+                if (qty && prefill.qty) qty.value = String(prefill.qty);
+            }
             (iVend||{}).focus?.();
-        });
+        }
         // Guardar/Cancelar nueva fila
         cont.addEventListener('click', function(e){
             const btnCancel = e.target.closest('.btn-cancel-new');
@@ -581,11 +658,26 @@ document.addEventListener('DOMContentLoaded', function(){
             fd.append('cantidad', String(cantidad));
             fetch('devoluciones_gestion.php', { method:'POST', body: fd, headers: { 'Accept': 'application/json' } })
                 .then(r => r.json())
-                .then(data => {
+                .then(async data => {
                     if (!data || data.ok !== true) throw new Error((data && data.message) || 'Error');
-                    // Recargar listado para reflejar la nueva fila
-                    if (typeof cargarDevoluciones === 'function') try { cargarDevoluciones(); } catch(_) {}
+                    // Refrescar solo el bloque del camión afectado y dejar preparada otra línea nueva
+                    await reloadVehiculoBlock(vehiculo);
                     if (typeof cargarVehiculos === 'function') try { cargarVehiculos(); } catch(_) {}
+                    try {
+                        // Fuerza refresco de opciones para que las listas incluyan el nuevo cliente/producto/vendedor
+                        const opts = await ensureDevOptions(true);
+                        const blocks = Array.from(cont.querySelectorAll('.bloque-vehiculo'));
+                        const bloque2 = blocks.find(b => {
+                            const btn = b.querySelector('.btn-add-line');
+                            return btn && (btn.getAttribute('data-vehiculo') || '') === vehiculo;
+                        });
+                        if (bloque2) addNewRowForBlock(bloque2, vehiculo, opts, {
+                            vendCode: codVend,
+                            cliCode: codCli,
+                            cliName: nomCli,
+                            qty: 1
+                        });
+                    } catch(_) {}
                 })
                 .catch(err => {
                     alert('No se pudo guardar: ' + (err.message||''));
@@ -595,6 +687,50 @@ document.addEventListener('DOMContentLoaded', function(){
                     if (row) row.remove();
                 });
         });
+        // Refresca solo el bloque de un vehículo específico sin recargar toda la vista
+        function reloadVehiculoBlock(vehiculoLabel){
+            return new Promise((resolve) => {
+            const fecha = document.getElementById('fecha_dev')?.value || '';
+            const codVend = document.getElementById('dev_cod_vend')?.value || '';
+            const codCli = document.getElementById('dev_cod_cli')?.value || '';
+            const qs = new URLSearchParams();
+            if (fecha) qs.append('fecha', fecha);
+            if (codVend) qs.append('cod_vendedor', codVend);
+            if (codCli) qs.append('cod_cliente', codCli);
+            // Para el caso SIN VEHICULO, el valor real es cadena vacía
+            if (vehiculoLabel && vehiculoLabel !== 'SIN VEHICULO') {
+                qs.append('vehiculo', vehiculoLabel);
+            } else {
+                // Forzar filtro a vacío para traer solo ese bloque especial
+                qs.append('vehiculo', '');
+            }
+            fetch('devoluciones_gestion.php?' + qs.toString())
+                .then(r => r.text())
+                .then(html => {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    const newBlock = tmp.querySelector('.bloque-vehiculo');
+                    if (!newBlock) { resolve(); return; }
+                    const blocks = Array.from(cont.querySelectorAll('.bloque-vehiculo'));
+                    const oldBlock = blocks.find(b => {
+                        const btn = b.querySelector('.btn-add-line');
+                        return btn && (btn.getAttribute('data-vehiculo') || '') === vehiculoLabel;
+                    });
+                    if (oldBlock) {
+                        oldBlock.replaceWith(newBlock);
+                    } else if (blocks.length) {
+                        // Si no existe (nuevo camión en la vista), lo insertamos al final
+                        cont.appendChild(newBlock);
+                    } else {
+                        // Si no hay bloques, reemplazar todo
+                        cont.innerHTML = '';
+                        cont.appendChild(newBlock);
+                    }
+                    resolve();
+                })
+                .catch(()=>{ resolve(); });
+            });
+        }
         cont.addEventListener('submit', function(e){
             const formEstados = e.target.closest('form.form-estados');
             const formBulk = e.target.closest('form.form-bulk');
