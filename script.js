@@ -507,7 +507,7 @@ document.addEventListener('DOMContentLoaded', function(){
             sortTableByColumn(table, colIndex, next);
         });
 
-        // Click en OK_Restantes por camión: asigna OK a todas las unidades restantes de cada fila del bloque
+        // Click en OK_Restantes por camión: asigna los restantes de cada fila usando su estado, en lote (rápido)
         cont.addEventListener('click', function(e){
             const btn = e.target.closest('.btn-ok-restantes');
             if (!btn) return;
@@ -518,51 +518,43 @@ document.addEventListener('DOMContentLoaded', function(){
             const origText = btn.textContent;
             btn.textContent = 'Procesando...';
             const forms = Array.from(bloque.querySelectorAll('form.form-bulk'));
-
-            let totalAsignadas = 0;
-            let filasAfectadas = 0;
-
-            // Procesar en serie para no saturar
-            (async function processAll(){
-                for (const form of forms) {
-                    const input = form.querySelector('input[name="cantidad"]');
-                    const select = form.querySelector('select[name="estado"]');
-                    const row = form.closest('tr');
-                    const msg = row ? row.querySelector('.msg-ajax') : null;
-                    const btnSubmit = form.querySelector('button[type="submit"]');
-                    const undoBtn = form.querySelector('button[data-undo="1"]');
-                    const restantes = parseInt(input?.max || '0', 10) || 0;
-                    if (restantes <= 0) continue;
-                    const chosen = (select && select.value) ? select.value : 'OK';
-                    if (msg) { msg.textContent = 'Asignando ' + chosen + ' ('+restantes+')...'; msg.className = 'msg-ajax'; }
-                    const fd = new FormData(form);
-                    try { fd.set('action', 'add_bulk'); fd.set('estado', chosen); fd.set('cantidad', String(restantes)); } catch(_) {}
-                    const data = await fetch('devoluciones_gestion.php', {
-                        method: 'POST', body: fd,
-                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
-                    }).then(r => {
-                        const ct = r.headers.get('content-type') || '';
-                        if (ct.indexOf('application/json') !== -1) return r.json();
-                        return r.text().then(t => ({ ok: r.ok, message: t }));
-                    });
-                    if (!data || data.ok === false) { throw new Error((data && data.message) || 'Error'); }
-                    // Actualizar UI fila
-                    if (row) {
-                        rebuildDevRows(row, data.devolucion_id, data);
-                        if (msg) { msg.textContent = ''; msg.className = 'msg-ajax'; }
-                    }
-                    totalAsignadas += data.assigned || restantes;
-                    filasAfectadas += 1;
-                }
-            })().then(()=>{
-                btn.textContent = 'Hecho ('+totalAsignadas+')';
+            // Construir un payload con todas las filas y su estado seleccionado
+            const items = [];
+            forms.forEach(form => {
+                const input = form.querySelector('input[name="cantidad"]');
+                const restantes = parseInt(input?.max || '0', 10) || 0;
+                if (restantes <= 0) return;
+                const devId = parseInt(form.querySelector('input[name="devolucion_id"]')?.value || '0', 10) || 0;
+                const estadoSel = form.querySelector('select[name="estado"]');
+                const estado = (estadoSel && estadoSel.value) ? estadoSel.value : 'OK';
+                if (devId > 0) items.push({ devolucion_id: devId, estado });
+            });
+            if (items.length === 0) {
+                btn.textContent = origText;
+                btn.disabled = false;
+                return;
+            }
+            fetch('devoluciones_gestion.php?action=bulk_restantes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                body: JSON.stringify({ items })
+            }).then(r => r.json()).then(data => {
+                if (!data || data.ok !== true) throw new Error((data && data.message) || 'Error');
+                // Actualizar cada fila afectada con el resultado
+                const resultados = Array.isArray(data.resultados) ? data.resultados : [];
+                resultados.forEach(res => {
+                    const devId = String(res.devolucion_id);
+                    const row = bloque.querySelector('tr.dev-row[data-dev-id="' + devId + '"]');
+                    if (row) rebuildDevRows(row, res.devolucion_id, res);
+                });
+                btn.textContent = 'Hecho ('+resultados.length+')';
                 if (typeof cargarVehiculos === 'function') {
-                    try { cargarVehiculos(); } catch(_){}
+                    try { cargarVehiculos(); } catch(_){ }
                 }
-            }).catch(err=>{
+            }).catch(err => {
                 btn.textContent = 'Error';
-                alert('Error en OK_Restantes: ' + err.message);
-            }).finally(()=>{
+                alert('Error en OK_Restantes: ' + (err.message||''));
+            }).finally(() => {
                 setTimeout(()=>{ btn.textContent = origText; btn.disabled = false; }, 1500);
             });
         });

@@ -261,6 +261,120 @@ if ($action === 'add_bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// Endpoint: asignar en bloque TODOS los restantes de múltiples devoluciones (optimiza OK_Restantes)
+if ($action === 'bulk_restantes' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Espera JSON: items: [ { devolucion_id, estado } ] (estado elegido por fila)
+    $raw = file_get_contents('php://input');
+    $permitidos = ['OK','No llego al almacen','Sin compra','No autorizado','No digitado'];
+    $payload = json_decode($raw, true);
+    if (!is_array($payload) || !isset($payload['items']) || !is_array($payload['items'])) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok'=>false,'message'=>'Formato inválido']);
+        exit;
+    }
+    $items = $payload['items'];
+    // Normalizar lista de IDs únicos válidos
+    $mapEstadoPorDev = [];
+    foreach ($items as $it) {
+        if (!isset($it['devolucion_id'])) continue;
+        $devId = (int)$it['devolucion_id'];
+        if ($devId <= 0) continue;
+        $estado = isset($it['estado']) ? trim((string)$it['estado']) : 'OK';
+        if (!in_array($estado, $permitidos, true)) $estado = 'OK';
+        $mapEstadoPorDev[$devId] = $estado; // último gana si hay duplicados
+    }
+    if (empty($mapEstadoPorDev)) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok'=>false,'message'=>'Sin devoluciones válidas']);
+        exit;
+    }
+    $devIds = array_keys($mapEstadoPorDev);
+    // Obtener cantidades totales de cada devolución
+    $place = implode(',', array_fill(0, count($devIds), '?'));
+    $types = str_repeat('i', count($devIds));
+    $stmtQty = $mysqli->prepare("SELECT id, cantidad FROM devoluciones_por_cliente WHERE id IN ($place)");
+    $stmtQty->bind_param($types, ...$devIds);
+    $stmtQty->execute();
+    $resQty = $stmtQty->get_result();
+    $cantPorDev = [];
+    while ($r = $resQty->fetch_assoc()) {
+        $cantPorDev[(int)$r['id']] = (int)round((float)$r['cantidad']);
+    }
+    $stmtQty->close();
+    // Obtener índices ya usados para todas las devoluciones
+    $stmtUsed = $mysqli->prepare("SELECT devolucion_id, unidad_index FROM devoluciones_estado WHERE devolucion_id IN ($place)");
+    $stmtUsed->bind_param($types, ...$devIds);
+    $stmtUsed->execute();
+    $resUsed = $stmtUsed->get_result();
+    $usadosPorDev = [];
+    while ($r = $resUsed->fetch_assoc()) {
+        $d = (int)$r['devolucion_id'];
+        $i = (int)$r['unidad_index'];
+        $usadosPorDev[$d][$i] = true;
+    }
+    $stmtUsed->close();
+
+    $mysqli->begin_transaction();
+    $stmtIns = $mysqli->prepare('INSERT INTO devoluciones_estado (devolucion_id, unidad_index, estado) VALUES (?,?,?)');
+    $resultados = [];
+    try {
+        foreach ($mapEstadoPorDev as $devId => $estado) {
+            $total = isset($cantPorDev[$devId]) ? (int)$cantPorDev[$devId] : 0;
+            if ($total < 1) $total = 1;
+            $usados = isset($usadosPorDev[$devId]) ? $usadosPorDev[$devId] : [];
+            // Calcular restantes
+            $restantesIdx = [];
+            for ($i=1; $i <= $total; $i++) {
+                if (!isset($usados[$i])) $restantesIdx[] = $i;
+            }
+            $cantRestantes = count($restantesIdx);
+            $assignedNow = 0;
+            if ($cantRestantes > 0) {
+                foreach ($restantesIdx as $idx) {
+                    $stmtIns->bind_param('iis', $devId, $idx, $estado);
+                    if (!$stmtIns->execute()) throw new Exception('Error asignando: ' . $stmtIns->error);
+                    $assignedNow++;
+                }
+            }
+            // Recalcular conteos finales para esta devolución
+            $counts = ['OK'=>0,'No llego al almacen'=>0,'Sin compra'=>0,'No autorizado'=>0,'No digitado'=>0,'otros'=>0];
+            $stmtC = $mysqli->prepare('SELECT estado, COUNT(*) c FROM devoluciones_estado WHERE devolucion_id = ? GROUP BY estado');
+            $stmtC->bind_param('i', $devId);
+            $stmtC->execute();
+            $resC = $stmtC->get_result();
+            $asignados = 0;
+            while ($rc = $resC->fetch_assoc()) {
+                $st = (string)$rc['estado'];
+                $c = (int)$rc['c'];
+                if (isset($counts[$st])) { $counts[$st] = $c; } else { $counts['otros'] += $c; }
+                $asignados += $c;
+            }
+            $stmtC->close();
+            $quedan = max(0, $total - $asignados);
+            $resultados[] = [
+                'devolucion_id' => $devId,
+                'estado' => $estado,
+                'assigned' => $assignedNow,
+                'counts' => $counts,
+                'restantes' => $quedan,
+                'asignados' => $asignados,
+                'total' => $total,
+            ];
+        }
+        $mysqli->commit();
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok'=>true,'resultados'=>$resultados]);
+    } catch (Throwable $e) {
+        $mysqli->rollback();
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok'=>false,'message'=>$e->getMessage()]);
+    }
+    exit;
+}
+
 if ($action === 'undo_all' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Deshacer TODO: eliminar todas las asignaciones de esa devolución
     $devId = isset($_POST['devolucion_id']) ? (int)$_POST['devolucion_id'] : 0;
