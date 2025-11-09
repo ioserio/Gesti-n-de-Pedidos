@@ -58,6 +58,7 @@
                         <li><a href="#" data-mod="ctacte_vendedor" onclick="mostrarModulo('ctacte_vendedor')">CTACTE/Vendedor</a></li>
                         <li><a href="#" data-mod="usuarios" onclick="mostrarModulo('usuarios')">Usuarios</a></li>
                         <li><a href="#" data-mod="permisos" onclick="mostrarModulo('permisos')">Permisos</a></li>
+                        <li><a href="#" data-mod="sesiones" onclick="mostrarModulo('sesiones')">Usuarios en línea</a></li>
                     </ul>
                 </li>
                 <li id="user-info" class="push-right"><a href="#" tabindex="-1" style="opacity:.95; cursor:default;">
@@ -217,6 +218,10 @@
             <button type="submit">Crear usuario</button>
         </form>
         <div id="lista-usuarios"></div>
+    </section>
+    <section id="modulo-sesiones" style="display:none;">
+        <h2>Usuarios en línea</h2>
+        <div id="lista-sesiones"></div>
     </section>
     <section id="modulo-permisos" style="display:none;">
         <h2>Permisos</h2>

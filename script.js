@@ -53,6 +53,7 @@ window.mostrarModulo = function(modulo) {
             'ctacte_vendedor':'ctacte_vendedor',
             'usuarios':'usuarios',
             'permisos':'permisos',
+            'sesiones':'usuarios',
             'inicio': null
         };
         if (modulo && map.hasOwnProperty(modulo) && map[modulo]) {
@@ -60,7 +61,7 @@ window.mostrarModulo = function(modulo) {
                 // Módulo bloqueado: mostrar Inicio y salir
                 const inicio = document.getElementById('modulo-inicio');
                 if (inicio) inicio.style.display = 'block';
-                const ids = ['modulo-subir','modulo-consultar','modulo-resumen','modulo-cobranzas','modulo-admin','modulo-rutas','modulo-usuarios','modulo-permisos','modulo-devoluciones','modulo-recojos'];
+                const ids = ['modulo-subir','modulo-consultar','modulo-resumen','modulo-cobranzas','modulo-admin','modulo-rutas','modulo-usuarios','modulo-permisos','modulo-devoluciones','modulo-recojos','modulo-sesiones'];
                 ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display='none'; });
                 return;
             }
@@ -89,6 +90,13 @@ window.mostrarModulo = function(modulo) {
         if (usuarios) usuarios.style.display = (modulo === 'usuarios') ? 'block' : 'none';
         const permisos = document.getElementById('modulo-permisos');
         if (permisos) permisos.style.display = (modulo === 'permisos') ? 'block' : 'none';
+        const sesiones = document.getElementById('modulo-sesiones');
+        if (sesiones) sesiones.style.display = (modulo === 'sesiones') ? 'block' : 'none';
+        // Detener auto-refresh de sesiones al salir del módulo
+        if (modulo !== 'sesiones' && window.__SESSIONS_TIMER) {
+            clearInterval(window.__SESSIONS_TIMER);
+            window.__SESSIONS_TIMER = null;
+        }
         const devol = document.getElementById('modulo-devoluciones');
         if (devol) devol.style.display = (modulo === 'devoluciones') ? 'block' : 'none';
         const recojos = document.getElementById('modulo-recojos');
@@ -134,6 +142,13 @@ window.mostrarModulo = function(modulo) {
             setTimeout(function(){ cargarPermisos(); }, 50);
         } else if (modulo === 'usuarios') {
             setTimeout(function(){ cargarUsuarios(); }, 50);
+        } else if (modulo === 'sesiones') {
+            setTimeout(function(){ cargarSesiones(); }, 50);
+            if (window.__SESSIONS_TIMER) { clearInterval(window.__SESSIONS_TIMER); }
+            window.__SESSIONS_TIMER = setInterval(function(){
+                const ses = document.getElementById('modulo-sesiones');
+                if (ses && ses.style.display !== 'none') cargarSesiones();
+            }, 30000);
     }
 }
 
@@ -881,6 +896,14 @@ document.addEventListener('DOMContentLoaded', function(){
             }
             // Guardar id de usuario actual globalmente
             window.__CURRENT_USER_ID = info.id || 0;
+            // Iniciar heartbeat (ping cada 60s) para mantener last_seen actualizado
+            try {
+                if (!window.__HEARTBEAT && window.__CURRENT_USER_ID) {
+                    const doPing = () => fetch('users_api.php?action=heartbeat', { method:'POST' }).catch(()=>{});
+                    doPing();
+                    window.__HEARTBEAT = setInterval(doPing, 60000);
+                }
+            } catch(_) {}
             // Cargar permisos del usuario y ocultar menús no permitidos
             try {
                 fetch('permisos_api.php?action=my', { cache:'no-store' })
@@ -975,6 +998,26 @@ function cargarRutas(){
         .then(r => r.text())
         .then(html => { cont.innerHTML = html; })
         .catch(()=>{ cont.innerHTML = '<p>Error al cargar rutas</p>'; });
+}
+
+// Admin: sesiones (usuarios en línea)
+function cargarSesiones(){
+    const cont = document.getElementById('lista-sesiones');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando sesiones...</p>';
+    const url = new URL('users_api.php', location.href);
+    url.searchParams.set('action','sessions');
+    fetch(url.toString())
+        .then(r => {
+            if (!r.ok) return r.text().then(t=>{ throw new Error(t||('HTTP '+r.status)); });
+            return r.text();
+        })
+        .then(html => {
+            cont.innerHTML = html;
+            const btn = document.getElementById('btn-refresh-sessions');
+            if (btn) btn.addEventListener('click', () => cargarSesiones());
+        })
+        .catch(err => { cont.innerHTML = '<p>Error al cargar sesiones: ' + (err.message||'') + '</p>'; });
 }
 
 // Cobranzas: cargar supervisores y vendedores

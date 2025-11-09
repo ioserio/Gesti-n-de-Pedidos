@@ -13,6 +13,26 @@ $mysqli->query("CREATE TABLE IF NOT EXISTS usuarios (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
+// Asegurar columnas de auditoría de sesión si no existen
+try {
+    $cols = [];
+    if ($res = $mysqli->query("SHOW COLUMNS FROM usuarios")) {
+        while ($c = $res->fetch_assoc()) { $cols[strtolower($c['Field'])] = true; }
+        $res->close();
+    }
+    $needsLogin = !isset($cols['last_login']);
+    $needsSeen = !isset($cols['last_seen']);
+    if ($needsLogin || $needsSeen) {
+        $alterParts = [];
+        if ($needsLogin) $alterParts[] = "ADD COLUMN last_login DATETIME NULL DEFAULT NULL AFTER created_at";
+        if ($needsSeen) $alterParts[] = "ADD COLUMN last_seen DATETIME NULL DEFAULT NULL AFTER last_login";
+        if (!empty($alterParts)) {
+            $sql = 'ALTER TABLE usuarios ' . implode(', ', $alterParts);
+            @$mysqli->query($sql);
+        }
+    }
+} catch (Throwable $e) { /* noop */ }
+
 // Semilla inicial: si la tabla está vacía, crear admin/admin (cámbialo luego)
 $needsSeed = false;
 if ($res = $mysqli->query("SELECT COUNT(*) c FROM usuarios")) {
@@ -64,6 +84,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['usuario'] = (string)$user['usuario'];
                 $_SESSION['nombre'] = (string)$user['nombre'];
                 $_SESSION['rol'] = (string)$user['rol'];
+                // Registrar último acceso y marca de actividad
+                try {
+                    $stmtT = $mysqli->prepare('UPDATE usuarios SET last_login = NOW(), last_seen = NOW() WHERE id = ?');
+                    $uid = (int)$user['id'];
+                    $stmtT->bind_param('i', $uid);
+                    $stmtT->execute();
+                    $stmtT->close();
+                } catch (Throwable $e) { /* noop */ }
                 $next = isset($_GET['next']) ? (string)$_GET['next'] : 'index.php';
                 if ($next === '' || stripos($next, 'login.php') !== false) { $next = 'index.php'; }
                 header('Location: ' . $next);
