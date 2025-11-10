@@ -182,6 +182,16 @@ function cargarResumen(fecha) {
 
 // Evento para el formulario de resumen
 document.addEventListener('DOMContentLoaded', function() {
+    // Flag de dispositivo móvil para forzar layout responsive aunque haya CSS viejo cacheado
+    function applyMobileFlag(){
+        try {
+            if (window.innerWidth <= 700) document.body.classList.add('is-mobile');
+            else document.body.classList.remove('is-mobile');
+        } catch(_){}
+    }
+    applyMobileFlag();
+    window.addEventListener('resize', applyMobileFlag);
+
     const formResumen = document.getElementById('form-resumen');
     if (formResumen) {
         formResumen.addEventListener('submit', function(e) {

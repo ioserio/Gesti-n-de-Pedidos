@@ -2,9 +2,17 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1280">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Gestión de Pedidos</title>
-    <link rel="stylesheet" href="estilos.css">
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta http-equiv="Pragma" content="no-cache" />
+        <meta http-equiv="Expires" content="0" />
+        <link rel="stylesheet" href="estilos.css?v=mobile1">
+        <style>
+            /* Fallback si el CSS queda en caché en móviles */
+            body.is-mobile table.resumen-desktop { display: none !important; }
+            body.is-mobile .resumen-mobile { display: block !important; }
+        </style>
 </head>
 <body>
     <header>

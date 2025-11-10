@@ -2,9 +2,17 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1280">
-    <title>Resumen de Pedidos por Vendedor</title>
-    <link rel="stylesheet" href="estilos.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Resumen de Pedidos por Vendedor</title>
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta http-equiv="Pragma" content="no-cache" />
+        <meta http-equiv="Expires" content="0" />
+        <link rel="stylesheet" href="estilos.css?v=mobile1">
+        <style>
+            /* Fallback por JS: si el body tiene .is-mobile, usar lista y ocultar la tabla */
+            body.is-mobile table.resumen-desktop { display: none !important; }
+            body.is-mobile .resumen-mobile { display: block !important; }
+        </style>
 </head>
 <body>
     <div class="container">
@@ -37,9 +45,19 @@
             });
     }
 
+    function applyMobileFlag(){
+        if (window.innerWidth <= 700) {
+            document.body.classList.add('is-mobile');
+        } else {
+            document.body.classList.remove('is-mobile');
+        }
+    }
+
     window.onload = function() {
         document.getElementById('filtroSupervisor').addEventListener('change', cargarResumen);
         cargarResumen();
+        applyMobileFlag();
+        window.addEventListener('resize', applyMobileFlag);
     };
     </script>
 </body>

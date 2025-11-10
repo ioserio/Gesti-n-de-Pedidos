@@ -66,7 +66,7 @@ if ($result->num_rows > 0) {
         $total_cuota += $cuotaVal;
         $rows[] = $row;
     }
-    echo '<table>';
+    echo '<table class="resumen-desktop">';
     echo '<tr><th colspan="7" style="text-align:left; background:#e6f2ff; font-size:17px;">';
     echo 'Pedidos totales: <b>' . $total_pedidos . '</b> &nbsp;|&nbsp; Monto total S/ <b>' . number_format($total_monto, 2, '.', ',') . '</b>';
     $pctGlobalRaw = $total_cuota > 0 ? (($total_monto / $total_cuota) * 100) : 0;
@@ -104,6 +104,41 @@ if ($result->num_rows > 0) {
         echo '</tr>';
     }
     echo '</table>';
+    
+    // Versión móvil tipo lista con barras de progreso grandes
+    echo '<div class="resumen-mobile">';
+    echo '<h3 class="rm-title">Resumen de Avance' . ($supervisor ? ' — ' . htmlspecialchars($supervisor) : '') . '</h3>';
+    echo '<div class="rm-list">';
+    foreach ($rows as $row) {
+        $vdRaw = trim((string)$row['Cod_Vendedor']);
+        $vdNoZeros = ltrim($vdRaw, '0');
+        if ($vdNoZeros === '') { $vdNoZeros = '0'; }
+        $vdPadded3 = str_pad($vdNoZeros, 3, '0', STR_PAD_LEFT);
+
+        $ventaVal = (float)$row['total_igv'];
+        $cuotaVal = isset($row['CuotaVal']) ? (float)$row['CuotaVal'] : 0.0;
+        $pctRaw = $cuotaVal > 0 ? (($ventaVal / $cuotaVal) * 100) : 0;
+        $pct = ($pctRaw < 100) ? floor($pctRaw) : round($pctRaw);
+        $pctCap = max(0, min(100, $pct));
+        $barClass = 'bar-red';
+        if ($pct >= 100) { $barClass = 'bar-green'; }
+        elseif ($pct >= 80) { $barClass = 'bar-yellow'; }
+        elseif ($pct >= 50) { $barClass = 'bar-orange'; }
+
+        // Para barras de porcentaje muy pequeñas asegurar visibilidad mínima si pct>0
+        $barWidth = ($pctCap > 0 && $pctCap < 6) ? 6 : $pctCap; // mínimo 6%
+
+        $label = htmlspecialchars($vdPadded3 . ' - ' . $row['Nom_Vendedor']);
+        $montoFmt = 'S/ ' . number_format($ventaVal, 2, '.', ',');
+        $cuotaFmt = $cuotaVal > 0 ? ('S/ ' . number_format($cuotaVal, 2, '.', ',')) : '—';
+        $pctTxt = $pct . '%';
+        echo '<div class="rm-item">';
+        echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . ' <span class="rm-pct">' . $pctTxt . '</span></div></div>';
+        echo   '<div class="rm-track"><span class="bar ' . $barClass . '" style="width:' . $barWidth . '%"></span></div>';
+        echo '</div>';
+    }
+    echo '</div>'; // .rm-list
+    echo '</div>'; // .resumen-mobile
 } else {
     echo '<p>No hay pedidos para hoy.</p>';
 }
