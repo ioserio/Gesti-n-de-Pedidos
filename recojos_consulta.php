@@ -90,11 +90,15 @@ if (!empty($ids)) {
     $stmtE->close();
 }
 
-// Tabla plana; reordenamos columnas para que Fecha sea la primera
+// Detectar modo móvil (ancho será manejado por CSS, pero permitimos ?mobile=1 para forzar)
+$forceMobile = isset($_GET['mobile']) && ($_GET['mobile'] === '1');
+
+// Preparamos buffers separados: tabla (desktop) y tarjetas (mobile)
+$cards = [];
 ob_start();
-echo '<table>';
+echo '<table class="recojos-desktop">';
 echo '<thead><tr>'
-    .'<th>Fecha</th><th>Camión</th><th>Cod_Vend</th><th>Cod_Cliente</th><th>Nombre Cliente</th><th>Cod_Prod</th><th>Producto</th><th>Cantidad</th><th>Estado</th>'
+    .'<th>Fecha</th><th>Camión</th><th>Cod_Vend</th><th>Cod_Cliente</th><th>Nombre Cliente</th><th>Cod_Prod</th><th>Producto</th><th>Cant</th><th>Estado</th>'
     .'</tr></thead><tbody>';
 
 $mostro = false;
@@ -143,19 +147,31 @@ foreach ($rows as $r) {
     }
     $mostro = true;
     foreach ($lineas as $ln) {
-        echo '<tr>';
-        // Nueva disposición de columnas: Fecha primero, luego Camión y Cod_Vend
-        echo '<td>' . esc($r['fecha']) . '</td>';
-        echo '<td>' . esc($veh) . '</td>';
-        echo '<td>' . esc($r['codigovendedor']) . '</td>';
-        echo '<td>' . esc($r['codigocliente']) . '</td>';
-        echo '<td>' . esc($r['nombrecliente']) . '</td>';
-        echo '<td>' . esc($r['codigoproducto']) . '</td>';
-        echo '<td>' . esc($r['nombreproducto']) . '</td>';
-        echo '<td style="text-align:right;">' . esc($ln['cantidad']) . '</td>';
-        // Ya no mostramos el badge de "Restan OK" en esta tabla
-        echo '<td>' . esc($ln['estado']) . '</td>';
-        echo '</tr>';
+        // Fila tabla (desktop)
+        echo '<tr>'
+            .'<td>' . esc($r['fecha']) . '</td>'
+            .'<td>' . esc($veh) . '</td>'
+            .'<td>' . esc($r['codigovendedor']) . '</td>'
+            .'<td>' . esc($r['codigocliente']) . '</td>'
+            .'<td>' . esc($r['nombrecliente']) . '</td>'
+            .'<td>' . esc($r['codigoproducto']) . '</td>'
+            .'<td>' . esc($r['nombreproducto']) . '</td>'
+            .'<td style="text-align:right;">' . esc($ln['cantidad']) . '</td>'
+            .'<td>' . esc($ln['estado']) . '</td>'
+            .'</tr>';
+        // Tarjeta móvil (abreviada). Un registro puede tener múltiples estados -> una tarjeta por estado
+        $cards[] = '<div class="rk-card">'
+            .'<div class="rk-head"><span class="rk-fecha">' . esc($r['fecha']) . '</span><span class="rk-vd">VD ' . esc($r['codigovendedor']) . '</span></div>'
+            .'<div class="rk-body">'
+                .'<div class="rk-line"><span class="rk-lbl">Cli:</span><span class="rk-val">' . esc($r['codigocliente']) . '</span></div>'
+                .'<div class="rk-line"><span class="rk-lbl">Prod:</span><span class="rk-val">' . esc($r['codigoproducto']) . '</span></div>'
+                .'<div class="rk-line"><span class="rk-lbl">Cant:</span><span class="rk-val">' . esc($ln['cantidad']) . '</span></div>'
+                .'<div class="rk-line"><span class="rk-lbl">Est:</span><span class="rk-est est-' . preg_replace('/[^a-z0-9]+/i','-', strtolower($ln['estado'])) . '">' . esc($ln['estado']) . '</span></div>'
+                // Nombres en filas completas, truncados para móvil
+                .'<div class="rk-line rk-wide"><span class="rk-lbl">Cliente:</span><span class="rk-val rk-trunc" title="' . esc($r['nombrecliente']) . '">' . esc($r['nombrecliente']) . '</span></div>'
+                .'<div class="rk-line rk-wide"><span class="rk-lbl">Producto:</span><span class="rk-val rk-trunc" title="' . esc($r['nombreproducto']) . '">' . esc($r['nombreproducto']) . '</span></div>'
+            .'</div>'
+            .'</div>';
     }
 }
 if (!$mostro) {
@@ -163,5 +179,10 @@ if (!$mostro) {
 }
 echo '</tbody></table>';
 $html = ob_get_clean();
-
-echo $html ?: '<p>Sin resultados.</p>';
+// Construir bloque móvil
+$cardsHtml = '';
+if (!empty($cards)) {
+    $cardsHtml = '<div class="recojos-mobile-grid">' . implode('', $cards) . '</div>';
+}
+// Salida combinada: ambos bloques, CSS ocultará según ancho
+echo ($html ?: '<p>Sin resultados.</p>') . $cardsHtml;

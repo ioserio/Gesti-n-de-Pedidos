@@ -18,6 +18,12 @@
     <header>
         <nav>
             <a href="index.php" class="brand-logo" aria-label="RikFlex Home">RikFlex</a>
+            <!-- Botón hamburguesa para móviles -->
+            <button class="mobile-nav-toggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="mobile-menu" type="button">
+                <span class="mn-bar"></span>
+                <span class="mn-bar"></span>
+                <span class="mn-bar"></span>
+            </button>
             <ul class="menu">
                 <li><a href="#" data-mod="importar" onclick="mostrarModulo('subir')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l4 4h-3v6h-2V7H8l4-4z"/><path d="M4 14h16v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/></svg></span>Importar</a></li>
                 <!-- Menú desplegable para Resumen de Pedidos -->
@@ -77,6 +83,8 @@
             </ul>
         </nav>
     </header>
+    <!-- Panel de menú móvil (clonado vía JS de la lista principal) -->
+    <div id="mobile-menu" class="mobile-menu-panel" aria-hidden="true"></div>
     <div class="container">
     <section id="modulo-inicio">
         <h2>Bienvenido</h2>

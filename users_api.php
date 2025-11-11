@@ -53,6 +53,8 @@ if ($action === 'heartbeat') {
 if ($action === 'sessions') {
     ensure_session_columns($mysqli);
     $mins = isset($_GET['mins']) ? max(1, (int)$_GET['mins']) : 5;
+    // Convertir a hora local (America/Lima) si la sesión no tiene TZ correcta (NOW() ya ajustado en conexion.php). Por si acaso, se puede forzar.
+    @$mysqli->query("SET time_zone='-05:00'");
     $res = $mysqli->query("SELECT id, usuario, nombre, rol, activo, created_at, last_login, last_seen, TIMESTAMPDIFF(MINUTE, last_seen, NOW()) AS mins_ago FROM usuarios ORDER BY activo DESC, (last_seen IS NULL) ASC, last_seen DESC, usuario ASC");
     $rows = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     if ($res) $res->close();

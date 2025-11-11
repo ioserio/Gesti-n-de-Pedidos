@@ -105,9 +105,21 @@ if ($result->num_rows > 0) {
     }
     echo '</table>';
     
-    // Versión móvil tipo lista con barras de progreso grandes
-    echo '<div class="resumen-mobile">';
-    echo '<h3 class="rm-title">Resumen de Avance' . ($supervisor ? ' — ' . htmlspecialchars($supervisor) : '') . '</h3>';
+        // Versión móvil tipo lista con resumen global
+        echo '<div class="resumen-mobile">';
+        // Preparar barra global (reutilizamos variables ya calculadas arriba)
+        $globalBarWidth = ($pctGlobalCap > 0 && $pctGlobalCap < 6) ? 6 : $pctGlobalCap; // mínimo 6%
+        $globalDataSmall = ($globalBarWidth < 15) ? ' data-small="1"' : '';
+        echo '<div class="rm-global">';
+        echo   '<div class="rg-metrics">'
+                        . '<span><strong>Pedidos:</strong> ' . $total_pedidos . '</span>'
+                        . '<span><strong>Monto:</strong> S/ ' . number_format($total_monto, 2, '.', ',') . '</span>'
+                        . '<span><strong>Cuota:</strong> S/ ' . number_format($total_cuota, 2, '.', ',') . '</span>'
+                        . '<span><strong>Avance:</strong> ' . $pctGlobal . '%</span>'
+                    . '</div>';
+        echo   '<div class="rg-bar"><div class="rg-track"><span class="bar ' . $gBarClass . '" style="width:' . $globalBarWidth . '%"' . $globalDataSmall . '><span class="pct-in">' . $pctGlobal . '%</span></span></div></div>';
+        echo '</div>';
+        echo '<h3 class="rm-title">Resumen de Avance' . ($supervisor ? ' — ' . htmlspecialchars($supervisor) : '') . '</h3>';
     echo '<div class="rm-list">';
     foreach ($rows as $row) {
         $vdRaw = trim((string)$row['Cod_Vendedor']);
@@ -132,10 +144,10 @@ if ($result->num_rows > 0) {
         $montoFmt = 'S/ ' . number_format($ventaVal, 2, '.', ',');
         $cuotaFmt = $cuotaVal > 0 ? ('S/ ' . number_format($cuotaVal, 2, '.', ',')) : '—';
         $pctTxt = $pct . '%';
-        echo '<div class="rm-item">';
-        echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . ' <span class="rm-pct">' . $pctTxt . '</span></div></div>';
-        echo   '<div class="rm-track"><span class="bar ' . $barClass . '" style="width:' . $barWidth . '%"></span></div>';
-        echo '</div>';
+    echo '<div class="rm-item">';
+    echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . '</div></div>';
+    echo   '<div class="rm-track"><span class="bar ' . $barClass . '" style="width:' . $barWidth . '%"><span class="pct-in">' . $pctTxt . '</span></span></div>';
+    echo '</div>';
     }
     echo '</div>'; // .rm-list
     echo '</div>'; // .resumen-mobile

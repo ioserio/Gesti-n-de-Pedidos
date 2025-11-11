@@ -1274,6 +1274,61 @@ document.addEventListener('DOMContentLoaded', function(){
     });
 });
 
+// Menú móvil: clonar menú de escritorio y manejar toggles
+document.addEventListener('DOMContentLoaded', function(){
+    const nav = document.querySelector('nav');
+    const desktopMenu = nav ? nav.querySelector('ul.menu') : null;
+    const panel = document.getElementById('mobile-menu');
+    const btn = document.querySelector('.mobile-nav-toggle');
+    if (!desktopMenu || !panel || !btn) return;
+    // Clonar estructura al panel
+    const clone = desktopMenu.cloneNode(true);
+    // limpiar clases específicas de layout
+    clone.classList.remove('menu');
+    panel.innerHTML = '';
+    panel.appendChild(clone);
+    // Marcar items con submenú para toggle por clic
+    panel.querySelectorAll('li.has-submenu > a').forEach(a => {
+        a.addEventListener('click', function(e){
+            e.preventDefault();
+            const li = a.parentElement;
+            const open = li.classList.contains('open');
+            // cerrar otros
+            panel.querySelectorAll('li.has-submenu.open').forEach(el => el.classList.remove('open'));
+            li.classList.toggle('open', !open);
+        });
+    });
+    // Botón hamburguesa abre/cierra panel
+    function togglePanel(force){
+        const isOpen = panel.classList.contains('open');
+        const next = (force==null) ? !isOpen : !!force;
+        panel.classList.toggle('open', next);
+        btn.setAttribute('aria-expanded', String(next));
+        panel.setAttribute('aria-hidden', String(!next));
+        document.body.style.overflow = next ? 'hidden' : '';
+    }
+    btn.addEventListener('click', function(){ togglePanel(); });
+    // Cerrar al tocar fuera
+    document.addEventListener('click', function(e){
+        if (!panel.contains(e.target) && !btn.contains(e.target)) togglePanel(false);
+    });
+    // Reaplicar permisos a enlaces clonados cuando se actualicen
+    try {
+        const observer = new MutationObserver(() => {
+            // Copiar clases is-enabled/is-disabled de desktop a mobile
+            panel.querySelectorAll('a[data-mod]').forEach(a => {
+                const mod = a.getAttribute('data-mod');
+                const desk = desktopMenu.querySelector('a[data-mod="'+mod+'"]');
+                if (desk) {
+                    a.classList.toggle('is-enabled', desk.classList.contains('is-enabled'));
+                    a.classList.toggle('is-disabled', desk.classList.contains('is-disabled'));
+                }
+            });
+        });
+        observer.observe(desktopMenu, { attributes:true, subtree:true, attributeFilter:['class'] });
+    } catch(_){}
+});
+
 // Bloquear navegación a módulos sin permiso
 document.addEventListener('click', function(e){
     const a = e.target.closest && e.target.closest('a[data-mod].is-disabled');

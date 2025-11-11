@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/conexion.php';
+@date_default_timezone_set('America/Lima');
 
 // Crear tabla de usuarios si no existe
 $mysqli->query("CREATE TABLE IF NOT EXISTS usuarios (
@@ -86,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['rol'] = (string)$user['rol'];
                 // Registrar último acceso y marca de actividad
                 try {
+                    // NOW() respeta la zona horaria de la sesión MySQL (seteada en conexion.php)
                     $stmtT = $mysqli->prepare('UPDATE usuarios SET last_login = NOW(), last_seen = NOW() WHERE id = ?');
                     $uid = (int)$user['id'];
                     $stmtT->bind_param('i', $uid);
@@ -105,24 +107,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=480, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Iniciar sesión - RikFlex</title>
     <link rel="stylesheet" href="estilos.css">
     <style>
-        body { background: #f2f6ff; }
-        .login-wrap { display:flex; align-items:center; justify-content:center; min-height: 100vh; padding: 24px; }
+        :root { --pad: 24px; }
+        html, body { height: 100%; }
+        body { background: #f2f6ff; margin:0; }
+        .login-wrap { display:flex; align-items:center; justify-content:center; min-height: 100vh; padding: var(--pad); box-sizing: border-box; }
         .login-card { width: 100%; max-width: 420px; background:#fff; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.08); padding:28px 26px; }
         .login-title { display:flex; align-items:center; gap:12px; margin-bottom: 18px; }
         .login-title .brand { background: rgba(0,123,255,.12); border:1px solid rgba(0,123,255,.25); color:#0b5ed7; padding:6px 10px; border-radius:10px; font-weight:800; letter-spacing:.3px; }
         .login-title h1 { font-size: 20px; margin: 0; color:#333; }
         .form-row { margin: 12px 0; }
         .form-row label { display:block; font-weight:600; color:#333; margin-bottom:6px; }
-        .form-row input { width:100%; padding:10px 12px; border:1px solid #cfd4da; border-radius:6px; font-size:15px; }
-        .btn-full { width:100%; display:block; text-align:center; padding:12px; background:#007bff; color:#fff; border:none; border-radius:6px; font-size:16px; cursor:pointer; }
+        /* 16px para evitar zoom en iOS al enfocar */
+        .form-row input { width:100%; padding:12px; border:1px solid #cfd4da; border-radius:8px; font-size:16px; box-sizing:border-box; }
+        .btn-full { width:100%; display:block; text-align:center; padding:12px; background:#007bff; color:#fff; border:none; border-radius:8px; font-size:16px; cursor:pointer; }
         .btn-full:hover { background:#0056b3; }
         .login-meta { display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:13px; color:#6c757d; }
         .err { background:#fdecea; border:1px solid #f5c2c0; color:#842029; padding:10px; border-radius:6px; margin:10px 0; }
         .hint { font-size:12px; color:#6c757d; margin-top:6px; }
+        /* Responsivo: móviles estrechos */
+        @media (max-width: 420px) {
+            :root { --pad: 14px; }
+            .login-card { padding:22px 18px; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.07); }
+            .login-title { gap:10px; }
+            .login-title .brand { padding:5px 8px; font-size:14px; }
+            .login-title h1 { font-size: 18px; }
+            .form-row { margin: 10px 0; }
+            .btn-full { padding: 12px; font-size: 16px; }
+        }
+        /* Muy pequeños (360px o menos) */
+        @media (max-width: 360px) {
+            .login-card { padding:18px 14px; }
+            .login-title h1 { font-size: 17px; }
+        }
     </style>
 </head>
 <body>
