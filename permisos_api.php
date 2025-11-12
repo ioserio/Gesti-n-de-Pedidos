@@ -6,17 +6,18 @@ header_remove('X-Powered-By');
 
 // Definir módulos disponibles
 $MODULES = [
-  'importar'    => 'Importar',
-  'consultar'   => 'Consulta por vd',
-  'resumen'     => 'Resumen de Pedidos',
-  'cobranzas'   => 'Gestión de Cobranzas',
-  'devoluciones'=> 'Gestión de Devoluciones',
-  'recojos'     => 'Consulta de Recojos',
-  'admin'       => 'Administrador de Cuotas',
-    'rutas'       => 'Rutas',
-        'ctacte_vendedor' => 'CTACTE/Vendedor',
-    'usuarios'    => 'Usuarios',
-  'permisos'    => 'Permisos',
+    'importar'        => 'Importar',
+    'consultar'       => 'Consulta por vd',
+    'resumen'         => 'Resumen de Pedidos',
+    'cobranzas'       => 'Gestión de Cobranzas',
+    'devoluciones'    => 'Gestión de Devoluciones',
+    'recojos'         => 'Consulta de Recojos',
+    'admin'           => 'Administrador de Cuotas (Legacy)',
+    'cuotas_hist'     => 'Cuotas Semanales / Histórico',
+    'rutas'           => 'Rutas',
+    'ctacte_vendedor' => 'CTACTE/Vendedor',
+    'usuarios'        => 'Usuarios',
+    'permisos'        => 'Permisos',
 ];
 
 $action = $_GET['action'] ?? ($_POST['action'] ?? 'list');

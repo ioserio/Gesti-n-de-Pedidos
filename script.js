@@ -10,6 +10,16 @@ function setFechaHoyResumen() {
     }
 }
 
+// Lunes de la semana actual (YYYY-MM-DD)
+function mondayOfCurrentWeek(){
+    const d = new Date();
+    const day = d.getDay(); // 0=Domingo
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // ajustar a lunes
+    const monday = new Date(d.setDate(diff));
+    monday.setHours(0,0,0,0);
+    return monday.toISOString().slice(0,10);
+}
+
     // Función para poner la fecha de hoy en el input de devoluciones
     function setFechaHoyDevoluciones() {
         const fechaInput = document.getElementById('fecha_dev');
@@ -49,6 +59,7 @@ window.mostrarModulo = function(modulo) {
             'devoluciones':'devoluciones',
             'recojos':'recojos',
             'admin':'admin',
+            'cuotas_hist':'cuotas_hist', // nueva página histórica semanal
             'rutas':'rutas',
             'ctacte_vendedor':'ctacte_vendedor',
             'usuarios':'usuarios',
@@ -114,7 +125,14 @@ window.mostrarModulo = function(modulo) {
         }, 100);
     } else if (modulo === 'admin') {
         // Cargar lista de cuotas
-        setTimeout(function(){ cargarCuotas(); }, 50);
+        setTimeout(function(){
+            cargarCuotas();
+            // Preparar listeners para plantilla masiva (legacy)
+            const addBtn = document.getElementById('btn-add-mass-legacy');
+            const saveBtn = document.getElementById('btn-save-mass-legacy');
+            if (addBtn && !addBtn.__wired) { addBtn.__wired = true; addBtn.addEventListener('click', buildMassTemplateLegacy); }
+            if (saveBtn && !saveBtn.__wired) { saveBtn.__wired = true; saveBtn.addEventListener('click', saveMassLegacy); }
+        }, 50);
         } else if (modulo === 'devoluciones') {
             setTimeout(function(){
                 setFechaHoyDevoluciones();
@@ -997,6 +1015,84 @@ function cargarCuotas(){
         .then(r => r.text())
         .then(html => { cont.innerHTML = html; })
         .catch(()=>{ cont.innerHTML = '<p>Error al cargar cuotas</p>'; });
+}
+
+// Admin legacy: construir plantilla masiva
+function buildMassTemplateLegacy(){
+    const massZone = document.getElementById('mass-zone-legacy');
+    const massTable = document.getElementById('mass-table-legacy');
+    const massMsg = document.getElementById('mass-msg-legacy');
+    if (!massZone || !massTable || !massMsg) return;
+    const lunes = mondayOfCurrentWeek();
+    massMsg.textContent = 'Cargando lista de vendedores...';
+    fetch('vendors_api.php', { headers: { 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest' } })
+        .then(async r => {
+            const text = await r.text();
+            let data; try { data = JSON.parse(text); } catch(e){ throw new Error((text||'').slice(0,200) || ('HTTP '+r.status)); }
+            return data;
+        })
+        .then(data => {
+            if (!data || data.ok !== true || !Array.isArray(data.vendors)) throw new Error('No se pudo obtener vendedores');
+            const vendors = data.vendors; // [{cod, nombre}]
+            // Orden ya viene ascendente y filtrado 001..997 desde vendors_api
+            const dayNames = {1:'Lunes',2:'Martes',3:'Miércoles',4:'Jueves',5:'Viernes',6:'Sábado'};
+            const rows = [];
+            rows.push('<table class="resumen-desktop"><thead><tr><th>Cod_Vendedor</th><th>Nombre</th><th>Día</th><th>Cuota (S/)</th><th>Vigente desde</th></tr></thead><tbody>');
+            for (let d=1; d<=6; d++) {
+                for (let i=0;i<vendors.length;i++){
+                    const cod = vendors[i].cod || '';
+                    const nom = vendors[i].nombre ? String(vendors[i].nombre) : '';
+                    rows.push('<tr class="mass-row" data-cod="'+cod+'" data-dia="'+d+'">'
+                        + '<td>'+cod+'</td>'
+                        + '<td>'+ (nom ? nom.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '') +'</td>'
+                        + '<td>'+dayNames[d]+'</td>'
+                        + '<td><input type="number" step="0.01" min="0" class="mass-cuota" style="width:110px;"></td>'
+                        + '<td><input type="date" class="mass-vigente" value="'+lunes+'" readonly></td>'
+                        + '</tr>');
+                }
+            }
+            rows.push('</tbody></table>');
+            massTable.innerHTML = rows.join('');
+            massZone.style.display = 'block';
+            const totalRows = vendors.length * 6;
+            massMsg.textContent = 'Plantilla generada: Lunes→Sábado con ' + vendors.length + ' vendedores (total ' + totalRows.toLocaleString('es-PE') + ' filas). Ingresa montos y luego pulsa "Guardar cambios".';
+        })
+        .catch(err => { massMsg.textContent = 'No se pudo cargar vendedores ('+(err && err.message ? err.message : 'error')+').'; });
+}
+
+// Admin legacy: guardar plantilla masiva
+function saveMassLegacy(){
+    const massTable = document.getElementById('mass-table-legacy');
+    const massMsg = document.getElementById('mass-msg-legacy');
+    if (!massTable || !massMsg) return;
+    const rows = Array.from(massTable.querySelectorAll('.mass-row'));
+    if (!rows.length) { massMsg.textContent = 'No hay filas para guardar.'; return; }
+    const items = [];
+    rows.forEach(tr => {
+        const cuotaEl = tr.querySelector('.mass-cuota');
+        const vigEl = tr.querySelector('.mass-vigente');
+        const val = parseFloat((cuotaEl && cuotaEl.value) || '0');
+        if (isNaN(val) || val <= 0) return;
+        items.push({
+            cod: tr.getAttribute('data-cod'),
+            dia: parseInt(tr.getAttribute('data-dia'),10)||0,
+            cuota: val,
+            vigente_desde: vigEl ? vigEl.value : mondayOfCurrentWeek()
+        });
+    });
+    if (!items.length) { massMsg.textContent = 'No hay montos > 0 para guardar.'; return; }
+    massMsg.textContent = 'Guardando ' + items.length + ' filas...';
+    const fd = new FormData();
+    fd.append('action','bulk');
+    fd.append('items', JSON.stringify(items));
+    fetch('cuotas_api.php?action=bulk', { method:'POST', body: fd })
+        .then(r=>r.json())
+        .then(j => {
+            if (!j || j.ok !== true) throw new Error(j && j.error || 'Error');
+            massMsg.textContent = 'Guardadas: ' + j.saved + '. Omitidas: ' + j.skipped + '.';
+            cargarCuotas();
+        })
+        .catch(err => { massMsg.textContent = 'Error: ' + (err.message||''); });
 }
 
 // Rutas: cargar listado

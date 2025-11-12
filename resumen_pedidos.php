@@ -22,13 +22,32 @@ $stmt->bind_param('s', $fecha);
 $stmt->execute();
 $result = $stmt->get_result();
 
-// Obtener cuotas por día de semana
+// Obtener cuotas por día de semana (con histórico por semana)
 $dow = intval(date('N', strtotime($fecha))); // 1=Lunes ... 7=Domingo
 $cuotas = [];
-$q = $mysqli->prepare("SELECT Cod_Vendedor, Cuota FROM cuotas_vendedor WHERE Dia_Semana=?");
-if ($q) { $q->bind_param('i', $dow); $q->execute(); $r = $q->get_result();
-    while ($rowq = $r->fetch_assoc()) { $cuotas[$rowq['Cod_Vendedor']] = (float)$rowq['Cuota']; }
-    $q->close();
+// 1) Intentar desde histórico: para cada vendedor, tomar la última cuota con vigente_desde <= $fecha
+$qh = $mysqli->prepare("SELECT Cod_Vendedor, Cuota, vigente_desde FROM cuotas_vendedor_hist WHERE Dia_Semana=? AND vigente_desde<=? ORDER BY Cod_Vendedor ASC, vigente_desde DESC");
+if ($qh) {
+    $qh->bind_param('is', $dow, $fecha);
+    $qh->execute();
+    $rh = $qh->get_result();
+    $seen = [];
+    while ($rowq = $rh->fetch_assoc()) {
+        $vd = (string)$rowq['Cod_Vendedor'];
+        if (!isset($seen[$vd])) { // primera (más reciente) por vendedor
+            $cuotas[$vd] = (float)$rowq['Cuota'];
+            $seen[$vd] = true;
+        }
+    }
+    $qh->close();
+}
+// 2) Completar faltantes desde tabla legacy si no hay histórico
+if (count($cuotas) === 0) {
+    $q = $mysqli->prepare("SELECT Cod_Vendedor, Cuota FROM cuotas_vendedor WHERE Dia_Semana=?");
+    if ($q) { $q->bind_param('i', $dow); $q->execute(); $r = $q->get_result();
+        while ($rowq = $r->fetch_assoc()) { $cuotas[$rowq['Cod_Vendedor']] = (float)$rowq['Cuota']; }
+        $q->close();
+    }
 }
 
 if ($result->num_rows > 0) {

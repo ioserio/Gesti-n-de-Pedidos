@@ -67,7 +67,8 @@
                         <span class="caret" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                     </a>
                     <ul class="submenu">
-                        <li><a href="#" data-mod="admin" onclick="mostrarModulo('admin')">Administrador de Cuotas</a></li>
+                        <li><a href="#" data-mod="admin" onclick="mostrarModulo('admin')">Administrador de Cuotas (Legacy)</a></li>
+                        <li><a href="cuotas_gestion.php" data-mod="cuotas_hist">Cuotas Semanales / Histórico</a></li>
                         <li><a href="#" data-mod="rutas" onclick="mostrarModulo('rutas')">Rutas</a></li>
                         <li><a href="#" data-mod="ctacte_vendedor" onclick="mostrarModulo('ctacte_vendedor')">CTACTE/Vendedor</a></li>
                         <li><a href="#" data-mod="usuarios" onclick="mostrarModulo('usuarios')">Usuarios</a></li>
@@ -186,6 +187,17 @@
             <input type="number" id="cuota_monto" name="cuota" step="0.01" min="0" required style="width:120px;">
             <button type="submit">Guardar Cuota</button>
         </form>
+        <!-- Agregado: plantilla masiva para cuotas (legacy) -->
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;">
+            <button type="button" id="btn-add-mass-legacy" style="background:#28a745; color:#fff; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;">Agregar cuotas</button>
+            <button type="button" id="btn-save-mass-legacy" style="background:#17a2b8; color:#fff; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;">Guardar cambios</button>
+            <span id="mass-msg-legacy" style="font-size:12px; color:#555;"></span>
+        </div>
+        <div id="mass-zone-legacy" class="table-zone" style="display:none; margin-bottom:10px;">
+            <h3 style="margin:6px 0; font-size:16px;">Nuevas cuotas a registrar (legacy)</h3>
+            <p style="font-size:12px; color:#666; margin:6px 0;">Se crearán filas por día (Lunes→Sábado) y por vendedor (001→997) ordenado ascendente. Edita la columna de Cuota. "Vigente desde" se fija al lunes de la semana actual. Pulsa "Guardar cambios" para registrar solo las filas con monto &gt; 0.</p>
+            <div id="mass-table-legacy"></div>
+        </div>
         <div id="lista-cuotas"></div>
     </section>
     <section id="modulo-ctacte-vendedor" style="display:none;">
