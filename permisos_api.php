@@ -9,6 +9,7 @@ $MODULES = [
     'importar'        => 'Importar',
     'consultar'       => 'Consulta por vd',
     'resumen'         => 'Resumen de Pedidos',
+    'seguimiento'     => 'Seguimiento de Pedidos',
     'cobranzas'       => 'Gestión de Cobranzas',
     'devoluciones'    => 'Gestión de Devoluciones',
     'recojos'         => 'Consulta de Recojos',

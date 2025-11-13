@@ -20,6 +20,18 @@ function mondayOfCurrentWeek(){
     return monday.toISOString().slice(0,10);
 }
 
+// Fecha de hoy para seguimiento de pedidos
+function setFechaHoySeguimiento(){
+    const el = document.getElementById('fecha_seguimiento');
+    if (el) {
+        const hoy = new Date();
+        const yyyy = hoy.getFullYear();
+        const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+        const dd = String(hoy.getDate()).padStart(2, '0');
+        el.value = `${yyyy}-${mm}-${dd}`;
+    }
+}
+
     // Función para poner la fecha de hoy en el input de devoluciones
     function setFechaHoyDevoluciones() {
         const fechaInput = document.getElementById('fecha_dev');
@@ -54,6 +66,7 @@ window.mostrarModulo = function(modulo) {
         const map = {
             'subir':'importar',
             'consultar':'consultar',
+            'seguimiento':'seguimiento',
             'resumen':'resumen',
             'cobranzas':'cobranzas',
             'devoluciones':'devoluciones',
@@ -82,6 +95,8 @@ window.mostrarModulo = function(modulo) {
     if (inicio) inicio.style.display = (modulo === 'inicio') ? 'block' : 'none';
     document.getElementById('modulo-subir').style.display = (modulo === 'subir') ? 'block' : 'none';
     document.getElementById('modulo-consultar').style.display = (modulo === 'consultar') ? 'block' : 'none';
+    const seg = document.getElementById('modulo-seguimiento');
+    if (seg) seg.style.display = (modulo === 'seguimiento') ? 'block' : 'none';
     document.getElementById('modulo-resumen').style.display = (modulo === 'resumen') ? 'block' : 'none';
     const cobr = document.getElementById('modulo-cobranzas');
     if (cobr) cobr.style.display = (modulo === 'cobranzas') ? 'block' : 'none';
@@ -122,6 +137,12 @@ window.mostrarModulo = function(modulo) {
             }
             // Cargar la etiqueta de última actualización
             try { cargarUltimaActualizacion(); } catch(_) {}
+        }, 100);
+    } else if (modulo === 'seguimiento') {
+        setTimeout(function(){
+            setFechaHoySeguimiento();
+            const f = document.getElementById('fecha_seguimiento');
+            if (f && f.value) cargarSeguimiento(f.value);
         }, 100);
     } else if (modulo === 'admin') {
         // Cargar lista de cuotas
@@ -198,6 +219,20 @@ function cargarResumen(fecha) {
     }
 }
 
+// Cargar seguimiento por rangos horarios
+function cargarSeguimiento(fecha){
+    const cont = document.getElementById('seguimiento');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando...</p>';
+    const supervisor = document.getElementById('supervisor_seguimiento') ? document.getElementById('supervisor_seguimiento').value : '';
+    let url = 'seguimiento_pedidos.php?fecha=' + encodeURIComponent(fecha || '');
+    if (supervisor) url += '&supervisor=' + encodeURIComponent(supervisor);
+    fetch(url)
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(() => { cont.innerHTML = '<p>Error al consultar seguimiento.</p>'; });
+}
+
 // Evento para el formulario de resumen
 document.addEventListener('DOMContentLoaded', function() {
     // Flag de dispositivo móvil para forzar layout responsive aunque haya CSS viejo cacheado
@@ -226,6 +261,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 const fecha = document.getElementById('fecha_resumen').value;
                 cargarResumen(fecha);
                 try { cargarUltimaActualizacion(); } catch(_) {}
+            });
+        }
+    }
+    // Evento para Seguimiento de Pedidos
+    const formSeg = document.getElementById('form-seguimiento');
+    if (formSeg) {
+        formSeg.addEventListener('submit', function(e){
+            e.preventDefault();
+            const fecha = document.getElementById('fecha_seguimiento').value;
+            cargarSeguimiento(fecha);
+        });
+        const supSeg = document.getElementById('supervisor_seguimiento');
+        if (supSeg) {
+            supSeg.addEventListener('change', function(){
+                const fecha = document.getElementById('fecha_seguimiento').value;
+                cargarSeguimiento(fecha);
             });
         }
     }

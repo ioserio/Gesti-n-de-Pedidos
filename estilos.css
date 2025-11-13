@@ -398,6 +398,31 @@ button {
 button:hover {
     background: #0056b3;
 }
+
+/* ========================
+   Seguimiento de Pedidos
+   ======================== */
+.seg-mobile { display:none; }
+.seg-mobile .seg-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.seg-mobile .seg-head h3 { margin:0; font-size:16px; color:#333; }
+.seg-mobile .seg-card { border:1px solid #e5e7eb; border-radius:8px; padding:10px; margin:10px 0; background:#fafafa; }
+.seg-mobile .seg-vendor { font-weight:800; font-size:16px; color:#111827; margin-bottom:6px; }
+.seg-mobile .seg-badges { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 8px 0; }
+.seg-mobile .seg-badge { background:#eef2ff; color:#111827; border-radius:999px; padding:4px 10px; font-weight:700; font-size:13px; min-width:64px; text-align:center; }
+.seg-mobile .seg-last { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; color:#374151; }
+.seg-mobile .seg-last .seg-time { font-weight:700; color:#111827; }
+
+/* Forzar tarjetas en móviles */
+@media (max-width: 700px) {
+    .seg-desktop { display:none; }
+    .seg-mobile { display:block; }
+}
+
+/* Paleta por rango para mejor escaneo */
+.seg-mobile .seg-badge.r1 { background:#dbeafe; color:#1e3a8a; } /* azul claro */
+.seg-mobile .seg-badge.r2 { background:#dcfce7; color:#065f46; } /* verde claro */
+.seg-mobile .seg-badge.r3 { background:#fef3c7; color:#92400e; } /* ámbar claro */
+.seg-mobile .seg-badge.r4 { background:#fee2e2; color:#991b1b; } /* rojo claro */
 table {
     width: 100%;
     min-width: 900px;

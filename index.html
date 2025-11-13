@@ -12,6 +12,8 @@
             /* Fallback si el CSS queda en caché en móviles */
             body.is-mobile table.resumen-desktop { display: none !important; }
             body.is-mobile .resumen-mobile { display: block !important; }
+            body.is-mobile table.seg-desktop { display: none !important; }
+            body.is-mobile .seg-mobile { display: block !important; }
         </style>
 </head>
 <body>
@@ -38,6 +40,12 @@
                             <a href="#" data-mod="consultar" onclick="mostrarModulo('consultar')">
                                 <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.35-4.35" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"/></svg></span>
                                 Consulta por vd
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" data-mod="seguimiento" onclick="mostrarModulo('seguimiento')">
+                                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 13h4l3 3 4-8 3 5h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                Seguimiento de Pedidos
                             </a>
                         </li>
                         <li>
@@ -156,6 +164,24 @@
             <span id="ultima_actualizacion" style="margin-left:auto; color:#555; font-weight:600; white-space:nowrap;"></span>
         </form>
         <div id="resumen"></div>
+    </section>
+    <section id="modulo-seguimiento" style="display:none;">
+        <h2>Seguimiento de Pedidos</h2>
+        <form id="form-seguimiento" style="margin-bottom:20px; display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+            <label for="fecha_seguimiento">Fecha:</label>
+            <input type="date" id="fecha_seguimiento" name="fecha" required>
+            <label for="supervisor_seguimiento" style="margin-left:15px;"><b>Supervisor:</b></label>
+            <select id="supervisor_seguimiento" name="supervisor">
+                <option value="">Todos</option>
+                <option value="JOSE">JOSE</option>
+                <option value="CARLOS">CARLOS</option>
+                <option value="JESUS">JESUS</option>
+                <option value="FRANCISCO">FRANCISCO</option>
+                <option value="OFICINA">OFICINA</option>
+            </select>
+            <button type="submit">Consultar</button>
+        </form>
+        <div id="seguimiento"></div>
     </section>
     <section id="modulo-cobranzas" style="display:none;">
         <h2>Gestión de Cobranzas</h2>
