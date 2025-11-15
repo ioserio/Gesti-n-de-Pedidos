@@ -56,6 +56,22 @@
                         </li>
                     </ul>
                 </li>
+                <!-- Nuevo menú Herramientas -->
+                <li class="has-submenu">
+                    <a href="#" class="submenu-toggle" aria-haspopup="true" aria-expanded="false">
+                        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3l3 3-8.4 8.4H6.3V14.7l8.4-8.4z"/><path d="M3 21h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                        Herramientas
+                        <span class="caret" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </a>
+                    <ul class="submenu">
+                        <li>
+                            <a href="#" data-mod="herramientas" onclick="mostrarModulo('herramientas')">
+                                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 11H7V9h2V7h2v2h2v2h-2v2H9v-2z"/><rect x="3" y="3" width="18" height="18" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+                                Consulta DNI / RUC
+                            </a>
+                        </li>
+                    </ul>
+                </li>
                 <li><a href="#" data-mod="cobranzas" onclick="mostrarModulo('cobranzas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 1a4 4 0 00-4 4v1H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a4 4 0 00-4-4zm-2 5V5a2 2 0 114 0v1h-4z"/></svg></span>Gestión de Cobranzas</a></li>
                 <li class="has-submenu">
                     <a href="#" class="submenu-toggle" aria-haspopup="true" aria-expanded="false">
@@ -330,6 +346,45 @@
             <button type="submit" style="margin-left:10px;">Consultar</button>
         </form>
         <div id="recojos"></div>
+    </section>
+    <!-- Módulo Herramientas: Consulta DNI / RUC -->
+    <section id="modulo-herramientas" style="display:none;">
+        <h2>Consulta DNI / RUC</h2>
+        <form id="form-herramientas" class="tool-form" onsubmit="return false;">
+            <div class="tf-row">
+                <label for="dni_input">DNI</label>
+                <input id="dni_input" name="dni" inputmode="numeric" pattern="\d{8}" maxlength="8" placeholder="Ej: 44332211" />
+                <button id="btn-dni" type="button">Consultar DNI</button>
+            </div>
+            <div class="tf-row">
+                <label for="ruc_input">RUC</label>
+                <input id="ruc_input" name="ruc" inputmode="numeric" pattern="\d{11}" maxlength="11" placeholder="Ej: 20481234567" />
+                <button id="btn-ruc" type="button">Consultar RUC</button>
+            </div>
+        </form>
+        <div id="tool-msg" class="tool-msg" aria-live="polite"></div>
+        <div class="tool-results">
+            <div id="dni_result" class="tool-card" hidden>
+                <h3>Resultado DNI</h3>
+                <div class="tr-grid">
+                    <div><b>DNI</b><span id="dni_res_dni">—</span></div>
+                    <div><b>Nombres</b><span id="dni_res_nombres">—</span></div>
+                    <div><b>Ap. Paterno</b><span id="dni_res_apep">—</span></div>
+                    <div><b>Ap. Materno</b><span id="dni_res_apem">—</span></div>
+                    <div class="wide"><b>Nombre completo</b><span id="dni_res_full">—</span></div>
+                </div>
+            </div>
+            <div id="ruc_result" class="tool-card" hidden>
+                <h3>Resultado RUC</h3>
+                <div class="tr-grid">
+                    <div><b>RUC</b><span id="ruc_res_ruc">—</span></div>
+                    <div class="wide"><b>Razón social</b><span id="ruc_res_razon">—</span></div>
+                    <div><b>Estado</b><span id="ruc_res_estado">—</span></div>
+                    <div><b>Condición</b><span id="ruc_res_cond">—</span></div>
+                    <div class="wide"><b>Dirección</b><span id="ruc_res_dir">—</span></div>
+                </div>
+            </div>
+        </div>
     </section>
     </div>
     <script src="script.js"></script>

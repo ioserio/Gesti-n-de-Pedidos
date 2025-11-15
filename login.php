@@ -165,7 +165,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="password" id="password" name="password" required>
             </div>
             <button type="submit" class="btn-full">Entrar</button>
-            <div class="hint">Consejo: primera vez usa admin / admin y luego cambia la clave.</div>
         </form>
     </div>
 </div>

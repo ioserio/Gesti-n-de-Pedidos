@@ -13,6 +13,7 @@ $MODULES = [
     'cobranzas'       => 'Gestión de Cobranzas',
     'devoluciones'    => 'Gestión de Devoluciones',
     'recojos'         => 'Consulta de Recojos',
+    'herramientas'    => 'Herramientas (DNI/RUC)',
     'admin'           => 'Administrador de Cuotas (Legacy)',
     'cuotas_hist'     => 'Cuotas Semanales / Histórico',
     'rutas'           => 'Rutas',

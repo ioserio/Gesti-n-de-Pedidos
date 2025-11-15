@@ -161,14 +161,14 @@ foreach ($rows as $r) {
             .'</tr>';
         // Tarjeta móvil (abreviada). Un registro puede tener múltiples estados -> una tarjeta por estado
         $cards[] = '<div class="rk-card">'
-            .'<div class="rk-head"><span class="rk-fecha">' . esc($r['fecha']) . '</span><span class="rk-vd">VD ' . esc($r['codigovendedor']) . '</span></div>'
+            .'<div class="rk-head"><span class="rk-fecha">' . esc($r['fecha']) . '</span><span class="rk-vd">VD ' . esc($r['codigovendedor']) . ' · CM: ' . esc($veh) . '</span></div>'
             .'<div class="rk-body">'
+                // Orden solicitado: 2da línea Cli + Est; 4ta línea Prod + Cant
                 .'<div class="rk-line"><span class="rk-lbl">Cli:</span><span class="rk-val">' . esc($r['codigocliente']) . '</span></div>'
+                .'<div class="rk-line"><span class="rk-lbl">Est:</span><span class="rk-est est-' . preg_replace('/[^a-z0-9]+/i','-', strtolower($ln['estado'])) . '">' . esc($ln['estado']) . '</span></div>'
+                .'<div class="rk-line rk-wide"><span class="rk-lbl">Cliente:</span><span class="rk-val rk-trunc" title="' . esc($r['nombrecliente']) . '">' . esc($r['nombrecliente']) . '</span></div>'
                 .'<div class="rk-line"><span class="rk-lbl">Prod:</span><span class="rk-val">' . esc($r['codigoproducto']) . '</span></div>'
                 .'<div class="rk-line"><span class="rk-lbl">Cant:</span><span class="rk-val">' . esc($ln['cantidad']) . '</span></div>'
-                .'<div class="rk-line"><span class="rk-lbl">Est:</span><span class="rk-est est-' . preg_replace('/[^a-z0-9]+/i','-', strtolower($ln['estado'])) . '">' . esc($ln['estado']) . '</span></div>'
-                // Nombres en filas completas, truncados para móvil
-                .'<div class="rk-line rk-wide"><span class="rk-lbl">Cliente:</span><span class="rk-val rk-trunc" title="' . esc($r['nombrecliente']) . '">' . esc($r['nombrecliente']) . '</span></div>'
                 .'<div class="rk-line rk-wide"><span class="rk-lbl">Producto:</span><span class="rk-val rk-trunc" title="' . esc($r['nombreproducto']) . '">' . esc($r['nombreproducto']) . '</span></div>'
             .'</div>'
             .'</div>';

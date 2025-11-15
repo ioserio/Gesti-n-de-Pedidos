@@ -68,6 +68,7 @@ window.mostrarModulo = function(modulo) {
             'consultar':'consultar',
             'seguimiento':'seguimiento',
             'resumen':'resumen',
+            'herramientas':'herramientas',
             'cobranzas':'cobranzas',
             'devoluciones':'devoluciones',
             'recojos':'recojos',
@@ -108,6 +109,8 @@ window.mostrarModulo = function(modulo) {
     }
     const admin = document.getElementById('modulo-admin');
     if (admin) admin.style.display = (modulo === 'admin') ? 'block' : 'none';
+        const herramientas = document.getElementById('modulo-herramientas');
+        if (herramientas) herramientas.style.display = (modulo === 'herramientas') ? 'block' : 'none';
         const rutas = document.getElementById('modulo-rutas');
         if (rutas) rutas.style.display = (modulo === 'rutas') ? 'block' : 'none';
         const vsmod = document.getElementById('modulo-ctacte-vendedor');
@@ -179,6 +182,8 @@ window.mostrarModulo = function(modulo) {
             setTimeout(function(){ cargarVS(); }, 50);
         } else if (modulo === 'permisos') {
             setTimeout(function(){ cargarPermisos(); }, 50);
+        } else if (modulo === 'herramientas') {
+            setTimeout(function(){ initHerramientas(); }, 50);
         } else if (modulo === 'usuarios') {
             setTimeout(function(){ cargarUsuarios(); }, 50);
         } else if (modulo === 'sesiones') {
@@ -189,6 +194,89 @@ window.mostrarModulo = function(modulo) {
                 if (ses && ses.style.display !== 'none') cargarSesiones();
             }, 30000);
     }
+}
+
+// Herramientas: inicialización y acciones
+let _toolsInited = false;
+function initHerramientas(){
+    if (_toolsInited) return; _toolsInited = true;
+    const $msg = document.getElementById('tool-msg');
+    const setMsg = (s,err)=>{ if($msg){ $msg.textContent=s||''; $msg.style.color = err?'#c0392b':'#2c3e50'; } };
+    const btnDni = document.getElementById('btn-dni');
+    const btnRuc = document.getElementById('btn-ruc');
+    if (btnDni && !btnDni.__wired){
+        btnDni.__wired = true;
+        btnDni.addEventListener('click', async ()=>{
+            const dni = (document.getElementById('dni_input').value||'').trim();
+            if (!/^\d{8}$/.test(dni)){ setMsg('Ingrese DNI válido (8 dígitos)', true); return; }
+            setMsg('Consultando DNI...');
+            const r = await postJSON('tools_dni.php',{dni});
+            if (!r || r.ok !== true){
+                let msg = (r && r.error) ? r.error : 'No se pudo consultar DNI';
+                if (r && r.detail) msg += ' ('+r.detail+')';
+                if (r && r.raw) msg += ' ['+r.raw+']';
+                setMsg(msg, true); return;
+            }
+                        // Mostrar intentos si existen (para depuración), incluso en éxito para saber variante
+                        /*try {
+                            if (r && Array.isArray(r.attempts)) {
+                                let box = document.getElementById('tool-attempts');
+                                if (!box) { box = document.createElement('pre'); box.id='tool-attempts'; box.style.padding='8px'; box.style.background='#f7f7f7'; box.style.border='1px solid #ddd'; box.style.fontSize='11px'; box.style.maxHeight='180px'; box.style.overflow='auto'; $msg.parentElement.insertBefore(box, $msg.nextSibling); }
+                                const lines = r.attempts.map(a => `${a.provider} ${a.variant||''} -> ${a.http} ${a.body}`);
+                                box.textContent = 'INTENTOS:\n' + lines.join('\n') + (r.auth_variant ? ('\nSeleccionado: '+r.source+' ('+r.auth_variant+')') : '');
+                            }
+                        } catch(_){} */
+            setMsg('');
+            document.getElementById('dni_res_dni').textContent = r.data.dni || '';
+            document.getElementById('dni_res_nombres').textContent = r.data.nombres || '';
+            document.getElementById('dni_res_apep').textContent = r.data.apellidoPaterno || '';
+            document.getElementById('dni_res_apem').textContent = r.data.apellidoMaterno || '';
+            document.getElementById('dni_res_full').textContent = r.data.nombreCompleto || '';
+            document.getElementById('dni_result').hidden = false;
+        });
+    }
+    if (btnRuc && !btnRuc.__wired){
+        btnRuc.__wired = true;
+        btnRuc.addEventListener('click', async ()=>{
+            const ruc = (document.getElementById('ruc_input').value||'').trim();
+            if (!/^\d{11}$/.test(ruc)){ setMsg('Ingrese RUC válido (11 dígitos)', true); return; }
+            setMsg('Consultando RUC...');
+            const r = await postJSON('tools_ruc.php',{ruc});
+            if (!r || r.ok !== true){
+                let msg = (r && r.error) ? r.error : 'No se pudo consultar RUC';
+                if (r && r.detail) msg += ' ('+r.detail+')';
+                if (r && r.raw) msg += ' ['+r.raw+']';
+                setMsg(msg, true); return;
+            }
+                        /*try {
+                            if (r && Array.isArray(r.attempts)) {
+                                let box = document.getElementById('tool-attempts');
+                                if (!box) { box = document.createElement('pre'); box.id='tool-attempts'; box.style.padding='8px'; box.style.background='#f7f7f7'; box.style.border='1px solid #ddd'; box.style.fontSize='11px'; box.style.maxHeight='180px'; box.style.overflow='auto'; $msg.parentElement.insertBefore(box, $msg.nextSibling); }
+                                const lines = r.attempts.map(a => `${a.provider} ${a.variant||''} -> ${a.http} ${a.body}`);
+                                box.textContent = 'INTENTOS:\n' + lines.join('\n') + (r.auth_variant ? ('\nSeleccionado: '+r.source+' ('+r.auth_variant+')') : '');
+                            }
+                        } catch(_){} */
+            setMsg('');
+            document.getElementById('ruc_res_ruc').textContent = r.data.ruc || '';
+            document.getElementById('ruc_res_razon').textContent = r.data.razonSocial || '';
+            document.getElementById('ruc_res_estado').textContent = r.data.estado || '';
+            document.getElementById('ruc_res_cond').textContent = r.data.condicion || '';
+            document.getElementById('ruc_res_dir').textContent = r.data.direccion || '';
+            document.getElementById('ruc_result').hidden = false;
+        });
+    }
+}
+
+async function postJSON(url, payload){
+    try{
+        const resp = await fetch(url,{
+            method:'POST',
+            headers:{ 'Content-Type':'application/json', 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest' },
+            body: JSON.stringify(payload||{})
+        });
+        const text = await resp.text();
+        try { return JSON.parse(text); } catch(e){ return { ok:false, error:`${resp.status} ${resp.statusText}`, raw: text && text.slice ? text.slice(0,180) : '' }; }
+    }catch(e){ return { ok:false, error: (e && e.message) ? e.message : 'Network error' }; }
 }
 
     function cargarUltimaActualizacion(){
