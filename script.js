@@ -232,6 +232,13 @@ function initHerramientas(){
             document.getElementById('dni_res_apep').textContent = r.data.apellidoPaterno || '';
             document.getElementById('dni_res_apem').textContent = r.data.apellidoMaterno || '';
             document.getElementById('dni_res_full').textContent = r.data.nombreCompleto || '';
+            // Campos extras si disponibles
+            const genero = (r.data.genero || '').toString().trim();
+            const fnac = (r.data.fechaNacimiento || '').toString().trim();
+            const codv = (r.data.codigoVerificacion || '').toString().trim();
+            const elGen = document.getElementById('dni_res_genero'); if (elGen) elGen.textContent = genero || '';
+            const elFn  = document.getElementById('dni_res_fnac'); if (elFn) elFn.textContent = fnac || '';
+            const elCv  = document.getElementById('dni_res_codver'); if (elCv) elCv.textContent = codv || '';
             document.getElementById('dni_result').hidden = false;
         });
     }
