@@ -554,3 +554,21 @@ th {
     .recojos-desktop { display:none !important; }
     .recojos-mobile-grid { display:grid; grid-template-columns: 1fr; gap:10px; margin-top:12px; }
 }
+/* Detalle expandible en tarjetas de recojos (móvil) */
+.rk-card { cursor: default; }
+.rk-card.open { box-shadow:0 2px 6px rgba(0,0,0,.12); }
+.rk-detail { border-top:1px solid #eef2f7; margin-top:6px; padding-top:6px; display:none; }
+.rk-drow { padding:6px 2px; border-bottom:1px dashed #edf2f7; }
+.rk-drow:last-child { border-bottom:none; }
+
+/* Modal para detalle de recojos */
+.rk-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:2000; align-items:center; justify-content:center; padding:14px; }
+.rk-modal-overlay.open { display:flex; }
+.rk-modal { background:#fff; width:100%; max-width:680px; max-height:82vh; overflow:auto; border-radius:12px; box-shadow:0 12px 28px rgba(0,0,0,.25); }
+.rk-modal-header { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #e5e7eb; }
+.rk-modal-header h3 { margin:0; font-size:16px; color:#111827; }
+.rk-modal-close { background:transparent; border:none; font-size:22px; line-height:1; cursor:pointer; padding:4px 8px; color:#444; }
+.rk-modal-body { padding:10px 12px; }
+.rk-modal-meta { display:grid; grid-template-columns: 1fr; gap:6px; margin-bottom:8px; font-size:13px; color:#374151; }
+.rk-modal-detail .rk-drow { padding:8px 2px; }
+@media (max-width: 480px) { .rk-modal { max-height:88vh; } }

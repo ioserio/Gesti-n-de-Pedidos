@@ -1006,8 +1006,81 @@ function cargarRecojos(){
             if (!r.ok) return r.text().then(t=>{ throw new Error(t||('HTTP '+r.status)); });
             return r.text();
         })
-        .then(html => { cont.innerHTML = html; })
+        .then(html => { cont.innerHTML = html; try { attachRecojosCardHandlers(); } catch(_){} })
         .catch((err) => { cont.innerHTML = '<p>Error al consultar recojos: ' + (err.message||'') + '</p>'; });
+}
+
+function attachRecojosCardHandlers(){
+    const cards = document.querySelectorAll('#recojos .rk-card');
+    // Bind per card only once
+    cards.forEach(card => {
+        if (card.__rkBound) return; card.__rkBound = true;
+        const openModal = () => openRecojoModal(card);
+        // Single click/tap opens modal for better mobile UX
+        card.addEventListener('click', openModal);
+        // Keyboard accessibility
+        card.addEventListener('keydown', (e) => { if (e.key === 'Enter') openModal(); });
+        // Keep dblclick inline toggle as a fallback (desktop)
+        const detail = card.querySelector('.rk-detail');
+        if (detail) {
+            const toggleInline = () => {
+                const isOpen = detail.style.display !== 'none';
+                detail.style.display = isOpen ? 'none' : 'block';
+                card.classList.toggle('open', !isOpen);
+            };
+            card.addEventListener('dblclick', (e) => { e.preventDefault(); toggleInline(); });
+        }
+    });
+}
+
+function ensureRecojoModal(){
+    let overlay = document.getElementById('rk-modal-overlay');
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'rk-modal-overlay';
+    overlay.className = 'rk-modal-overlay';
+    overlay.innerHTML = '<div class="rk-modal" role="dialog" aria-modal="true" aria-labelledby="rk-modal-title">'
+        + '<div class="rk-modal-header"><h3 id="rk-modal-title">Detalle de Recojo</h3><button type="button" class="rk-modal-close" aria-label="Cerrar">×</button></div>'
+        + '<div class="rk-modal-body"></div>'
+        + '</div>';
+    document.body.appendChild(overlay);
+    // Close handlers
+    const close = () => closeRecojoModal();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('.rk-modal-close').addEventListener('click', close);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && overlay.classList.contains('open')) close(); });
+    return overlay;
+}
+
+function openRecojoModal(card){
+    const overlay = ensureRecojoModal();
+    const body = overlay.querySelector('.rk-modal-body');
+    // Build content from the card
+    const fecha = card.querySelector('.rk-fecha')?.textContent || '';
+    const vdVeh = card.querySelector('.rk-vd')?.textContent || '';
+    const cliCod = card.querySelector('.rk-body .rk-line .rk-val')?.textContent || '';
+    const cliName = card.querySelector('.rk-body .rk-wide .rk-val')?.getAttribute('title') || card.querySelector('.rk-body .rk-wide .rk-val')?.textContent || '';
+    const detail = card.querySelector('.rk-detail');
+    const detailHTML = detail ? detail.innerHTML : '<div class="rk-drow"><em>Sin detalle</em></div>';
+    body.innerHTML = ''
+        + '<div class="rk-modal-meta">'
+        + '<div><b>Fecha:</b> ' + escapeHtml(fecha) + '</div>'
+        + '<div><b>VD/CM:</b> ' + escapeHtml(vdVeh) + '</div>'
+        + '<div><b>Cliente:</b> ' + escapeHtml(cliCod) + ' — ' + escapeHtml(cliName) + '</div>'
+        + '</div>'
+        + '<div class="rk-modal-detail">' + detailHTML + '</div>';
+    overlay.classList.add('open');
+}
+
+function closeRecojoModal(){
+    const overlay = document.getElementById('rk-modal-overlay');
+    if (overlay) overlay.classList.remove('open');
+}
+
+function escapeHtml(s){
+    return String(s||'').replace(/[&<>"']/g, function(c){
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'} )[c];
+    });
 }
 
 // Listener formulario recojos

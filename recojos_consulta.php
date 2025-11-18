@@ -95,6 +95,8 @@ $forceMobile = isset($_GET['mobile']) && ($_GET['mobile'] === '1');
 
 // Preparamos buffers separados: tabla (desktop) y tarjetas (mobile)
 $cards = [];
+// Para tarjetas móviles agrupadas por cliente (y fecha/vendedor/vehículo)
+$groups = [];
 ob_start();
 echo '<table class="recojos-desktop">';
 echo '<thead><tr>'
@@ -146,6 +148,36 @@ foreach ($rows as $r) {
         continue;
     }
     $mostro = true;
+    // Acumular para tarjetas móviles agrupadas por cliente
+    $gkey = implode('|', [
+        (string)$r['fecha'], (string)$veh, (string)$r['codigovendedor'], (string)$r['codigocliente']
+    ]);
+    if (!isset($groups[$gkey])) {
+        $groups[$gkey] = [
+            'fecha' => (string)$r['fecha'],
+            'vehiculo' => $veh,
+            'codigovendedor' => (string)$r['codigovendedor'],
+            'codigocliente' => (string)$r['codigocliente'],
+            'nombrecliente' => (string)$r['nombrecliente'],
+            'items' => [],
+            'total_cant' => 0,
+            'total_ok' => 0
+        ];
+    }
+    $groups[$gkey]['total_cant'] += $cant;
+    $groups[$gkey]['total_ok'] += $counts['OK'];
+    $groups[$gkey]['items'][] = [
+        'prod_cod' => (string)$r['codigoproducto'],
+        'prod_nom' => (string)$r['nombreproducto'],
+        'cant' => $cant,
+        'ok' => $counts['OK'],
+        'sin_compra' => $counts['Sin compra'],
+        'no_llego' => $counts['No llego al almacen'],
+        'no_aut' => $counts['No autorizado'],
+        'no_digitado' => $counts['No digitado'],
+        'pend' => $restan
+    ];
+
     foreach ($lineas as $ln) {
         // Fila tabla (desktop)
         echo '<tr>'
@@ -159,19 +191,7 @@ foreach ($rows as $r) {
             .'<td style="text-align:right;">' . esc($ln['cantidad']) . '</td>'
             .'<td>' . esc($ln['estado']) . '</td>'
             .'</tr>';
-        // Tarjeta móvil (abreviada). Un registro puede tener múltiples estados -> una tarjeta por estado
-        $cards[] = '<div class="rk-card">'
-            .'<div class="rk-head"><span class="rk-fecha">' . esc($r['fecha']) . '</span><span class="rk-vd">VD ' . esc($r['codigovendedor']) . ' · CM: ' . esc($veh) . '</span></div>'
-            .'<div class="rk-body">'
-                // Orden solicitado: 2da línea Cli + Est; 4ta línea Prod + Cant
-                .'<div class="rk-line"><span class="rk-lbl">Cli:</span><span class="rk-val">' . esc($r['codigocliente']) . '</span></div>'
-                .'<div class="rk-line"><span class="rk-lbl">Est:</span><span class="rk-est est-' . preg_replace('/[^a-z0-9]+/i','-', strtolower($ln['estado'])) . '">' . esc($ln['estado']) . '</span></div>'
-                .'<div class="rk-line rk-wide"><span class="rk-lbl">Cliente:</span><span class="rk-val rk-trunc" title="' . esc($r['nombrecliente']) . '">' . esc($r['nombrecliente']) . '</span></div>'
-                .'<div class="rk-line"><span class="rk-lbl">Prod:</span><span class="rk-val">' . esc($r['codigoproducto']) . '</span></div>'
-                .'<div class="rk-line"><span class="rk-lbl">Cant:</span><span class="rk-val">' . esc($ln['cantidad']) . '</span></div>'
-                .'<div class="rk-line rk-wide"><span class="rk-lbl">Producto:</span><span class="rk-val rk-trunc" title="' . esc($r['nombreproducto']) . '">' . esc($r['nombreproducto']) . '</span></div>'
-            .'</div>'
-            .'</div>';
+        // Antes: tarjetas por estado; ahora generaremos tarjetas agrupadas más abajo
     }
 }
 if (!$mostro) {
@@ -179,10 +199,40 @@ if (!$mostro) {
 }
 echo '</tbody></table>';
 $html = ob_get_clean();
-// Construir bloque móvil
+// Construir bloque móvil agrupado por cliente
 $cardsHtml = '';
-if (!empty($cards)) {
-    $cardsHtml = '<div class="recojos-mobile-grid">' . implode('', $cards) . '</div>';
+if (!empty($groups)) {
+    $out = [];
+    foreach ($groups as $g) {
+        $estadoGlobal = ($g['total_cant'] > 0 && $g['total_ok'] >= $g['total_cant']) ? 'OK' : 'Pendiente';
+        $estadoClass = ($estadoGlobal === 'OK') ? 'est-ok' : 'est-pendientes';
+        $detailRows = [];
+        foreach ($g['items'] as $it) {
+            $badges = [];
+            if ($it['ok'] > 0) $badges[] = '<span class="rk-est est-ok">OK</span>';
+            if ($it['sin_compra'] > 0) $badges[] = '<span class="rk-est est-sin-compra">Sin compra</span>';
+            if ($it['no_llego'] > 0) $badges[] = '<span class="rk-est est-no-llego-al-almacen">No llegó</span>';
+            if ($it['no_aut'] > 0) $badges[] = '<span class="rk-est est-no-autorizado">No aut.</span>';
+            if ($it['no_digitado'] > 0) $badges[] = '<span class="rk-est est-no-digitado">No digitado</span>';
+            if ($it['pend'] > 0) $badges[] = '<span class="rk-est est-pendientes">Pend.</span>';
+            $detailRows[] = '<div class="rk-drow">'
+                . '<div class="rk-line"><span class="rk-lbl">Prod:</span><span class="rk-val">' . esc($it['prod_cod']) . '</span></div>'
+                . '<div class="rk-line rk-wide"><span class="rk-lbl">Producto:</span><span class="rk-val rk-trunc" title="' . esc($it['prod_nom']) . '">' . esc($it['prod_nom']) . '</span></div>'
+                . '<div class="rk-line"><span class="rk-lbl">Cant:</span><span class="rk-val">' . esc($it['cant']) . '</span></div>'
+                . '<div class="rk-line rk-wide">' . implode(' ', $badges) . '</div>'
+                . '</div>';
+        }
+        $out[] = '<div class="rk-card" tabindex="0">'
+            . '<div class="rk-head"><span class="rk-fecha">' . esc($g['fecha']) . '</span><span class="rk-vd">VD ' . esc($g['codigovendedor']) . ' · CM: ' . esc($g['vehiculo']) . '</span></div>'
+            . '<div class="rk-body">'
+                . '<div class="rk-line"><span class="rk-lbl">Cli:</span><span class="rk-val">' . esc($g['codigocliente']) . '</span></div>'
+                . '<div class="rk-line"><span class="rk-lbl">Est:</span><span class="rk-est ' . $estadoClass . '">' . esc($estadoGlobal) . '</span></div>'
+                . '<div class="rk-line rk-wide"><span class="rk-lbl">Cliente:</span><span class="rk-val rk-trunc" title="' . esc($g['nombrecliente']) . '">' . esc($g['nombrecliente']) . '</span></div>'
+            . '</div>'
+            . '<div class="rk-detail" style="display:none;">' . implode('', $detailRows) . '</div>'
+            . '</div>';
+    }
+    $cardsHtml = '<div class="recojos-mobile-grid">' . implode('', $out) . '</div>';
 }
 // Salida combinada: ambos bloques, CSS ocultará según ancho
 echo ($html ?: '<p>Sin resultados.</p>') . $cardsHtml;
