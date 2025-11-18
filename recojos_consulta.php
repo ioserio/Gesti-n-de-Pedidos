@@ -93,15 +93,10 @@ if (!empty($ids)) {
 // Detectar modo móvil (ancho será manejado por CSS, pero permitimos ?mobile=1 para forzar)
 $forceMobile = isset($_GET['mobile']) && ($_GET['mobile'] === '1');
 
-<<<<<<< HEAD
 // Preparamos buffers separados: tabla (desktop) y tarjetas (mobile)
 $cards = [];
 // Para tarjetas móviles agrupadas por cliente (y fecha/vendedor/vehículo)
 $groups = [];
-=======
-// Preparamos buffers separados: tabla (desktop) y tarjetas agrupadas (mobile)
-$mobileGroups = [];
->>>>>>> 9c6b0b929818f37fddb7b5cbfd96b736d2b9bec2
 ob_start();
 echo '<table class="recojos-desktop">';
 echo '<thead><tr>'
@@ -153,7 +148,6 @@ foreach ($rows as $r) {
         continue;
     }
     $mostro = true;
-<<<<<<< HEAD
     // Acumular para tarjetas móviles agrupadas por cliente
     $gkey = implode('|', [
         (string)$r['fecha'], (string)$veh, (string)$r['codigovendedor'], (string)$r['codigocliente']
@@ -184,11 +178,6 @@ foreach ($rows as $r) {
         'pend' => $restan
     ];
 
-=======
-    // Pendientes reales: unidades en estado 'No digitado' (aún sin clasificar definitiva)
-    $pendUnitsForRecord = $counts['No digitado'];
-    $addedPendToGroup = false;
->>>>>>> 9c6b0b929818f37fddb7b5cbfd96b736d2b9bec2
     foreach ($lineas as $ln) {
         // Fila tabla (desktop)
         echo '<tr>'
@@ -202,40 +191,7 @@ foreach ($rows as $r) {
             .'<td style="text-align:right;">' . esc($ln['cantidad']) . '</td>'
             .'<td>' . esc($ln['estado']) . '</td>'
             .'</tr>';
-<<<<<<< HEAD
         // Antes: tarjetas por estado; ahora generaremos tarjetas agrupadas más abajo
-=======
-        // Agrupar SIEMPRE para móviles (independiente de filtro de pendientes)
-        $gkey = implode('|', [
-            $r['fecha'], $veh, trim((string)$r['codigovendedor']), trim((string)$r['codigocliente'])
-        ]);
-        if (!isset($mobileGroups[$gkey])) {
-            $mobileGroups[$gkey] = [
-                'fecha' => $r['fecha'],
-                'vehiculo' => $veh,
-                'cod_vend' => trim((string)$r['codigovendedor']),
-                'nom_vend' => (string)$r['nombrevendedor'],
-                'cod_cli'  => trim((string)$r['codigocliente']),
-                'nom_cli'  => (string)$r['nombrecliente'],
-                'pend'     => 0,
-                'total_items' => 0,
-                'lines'    => []
-            ];
-        }
-        // Sumar pendientes (No digitado) solo una vez por registro
-        if (!$addedPendToGroup && $pendUnitsForRecord > 0) {
-            $mobileGroups[$gkey]['pend'] += $pendUnitsForRecord;
-            $addedPendToGroup = true;
-        }
-        $mobileGroups[$gkey]['total_items'] += (int)$ln['cantidad'];
-        // Guardar línea para modal (producto + estado + cantidad)
-        $mobileGroups[$gkey]['lines'][] = [
-            'cod_prod' => (string)$r['codigoproducto'],
-            'nom_prod' => (string)$r['nombreproducto'],
-            'estado'   => (string)$ln['estado'],
-            'cantidad' => (int)$ln['cantidad']
-        ];
->>>>>>> 9c6b0b929818f37fddb7b5cbfd96b736d2b9bec2
     }
 }
 if (!$mostro) {
@@ -243,7 +199,6 @@ if (!$mostro) {
 }
 echo '</tbody></table>';
 $html = ob_get_clean();
-<<<<<<< HEAD
 // Construir bloque móvil agrupado por cliente
 $cardsHtml = '';
 if (!empty($groups)) {
@@ -278,79 +233,6 @@ if (!empty($groups)) {
             . '</div>';
     }
     $cardsHtml = '<div class="recojos-mobile-grid">' . implode('', $out) . '</div>';
-=======
-// Construir bloque móvil (agrupado por cliente con modal)
-$cardsHtml = '';
-if (!empty($mobileGroups)) {
-    $parts = [];
-    $idx = 0;
-    foreach ($mobileGroups as $g) {
-        $badgePend = '<span class="rk-badge-pend">Pend: ' . esc($g['pend']) . '</span>';
-        $badgeTot = '<span class="rk-badge-total">Items: ' . esc($g['total_items']) . '</span>';
-        $jsonLines = json_encode($g['lines'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        $parts[] = '<div class="rk-group-card">'
-            .'<button type="button" class="rk-group-summary" data-group-id="' . $idx . '"'
-                .' data-fecha="' . esc($g['fecha']) . '"'
-                .' data-vehiculo="' . esc($g['vehiculo']) . '"'
-                .' data-vendedor="' . esc($g['cod_vend']) . '"'
-                .' data-cliente="' . esc($g['cod_cli']) . '"'
-                .' data-cliente-nom="' . esc($g['nom_cli']) . '">'
-                .'<div class="rk-group-top">'
-                    .'<span class="rk-fecha">' . esc($g['fecha']) . '</span>'
-                    .'<span class="rk-vd">VD ' . esc($g['cod_vend']) . ' · CM: ' . esc($g['vehiculo']) . '</span>'
-                .'</div>'
-                .'<div class="rk-group-mid">'
-                    .'<span class="rk-cli" title="' . esc($g['nom_cli']) . '">' . esc($g['nom_cli']) . ' (' . esc($g['cod_cli']) . ')</span>'
-                .'</div>'
-                .'<div class="rk-group-badges">' . $badgePend . $badgeTot . '</div>'
-            .'</button>'
-            .'<script type="application/json" class="rk-lines" data-group-id="' . $idx . '">' . esc($jsonLines) . '</script>'
-        .'</div>';
-        $idx++;
-    }
-        $modalHtml = <<<'HTML'
-<div id="rk-modal" class="rk-modal" hidden><div class="rk-modal-content"><button type="button" class="rk-modal-close" aria-label="Cerrar">×</button><div id="rk-modal-body"></div></div></div>
-<script>
-(function(){
-    function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');}
-    function openModal(btn){
-        try {
-            var gid = btn.getAttribute('data-group-id');
-            var script = document.querySelector("script.rk-lines[data-group-id='"+gid+"']");
-            var jsonStr = script ? script.textContent : '[]';
-            var lines = JSON.parse(jsonStr || '[]');
-            var mb = document.getElementById('rk-modal-body');
-            var modal = document.getElementById('rk-modal');
-            if(!mb || !modal) return;
-            var html = "<h3 style='margin-top:0;margin-bottom:10px;font-size:16px;font-weight:800;'>" + escapeHtml(btn.getAttribute('data-cliente-nom')) + " (" + escapeHtml(btn.getAttribute('data-cliente')) + ")</h3>";
-            html += "<p style='margin:4px 0 10px 0;font-size:13px;color:#374151;'>Fecha: " + escapeHtml(btn.getAttribute('data-fecha')) + " · VD " + escapeHtml(btn.getAttribute('data-vendedor')) + " · Camión: " + escapeHtml(btn.getAttribute('data-vehiculo')) + "</p>";
-            if(lines.length){
-                html += "<table class='rk-modal-table'><thead><tr><th>Cod Prod</th><th>Producto</th><th>Estado</th><th style='text-align:right;'>Cant</th></tr></thead><tbody>";
-                for(var i=0;i<lines.length;i++){var L=lines[i];html += "<tr><td>"+escapeHtml(L.cod_prod)+"</td><td>"+escapeHtml(L.nom_prod)+"</td><td>"+escapeHtml(L.estado)+"</td><td style='text-align:right;'>"+L.cantidad+"</td></tr>";}
-                html += "</tbody></table>";
-            } else {
-                html += "<p>Sin líneas.</p>";
-            }
-            mb.innerHTML = html;
-            modal.hidden = false;
-            document.body.classList.add('rk-modal-open');
-        } catch(err){ console.error(err); }
-    }
-    document.addEventListener('click', function(e){
-        var btn = e.target.closest('.rk-group-summary');
-        if(btn){ openModal(btn); }
-        var close = e.target.closest('.rk-modal-close');
-        if(close){ var modal=document.getElementById('rk-modal'); if(modal){ modal.hidden=true; document.body.classList.remove('rk-modal-open'); } }
-        if(e.target.id==='rk-modal'){ var modal=document.getElementById('rk-modal'); if(modal){ modal.hidden=true; document.body.classList.remove('rk-modal-open'); } }
-    });
-    document.addEventListener('keydown', function(e){
-        if(e.key==='Escape'){ var modal=document.getElementById('rk-modal'); if(modal && !modal.hidden){ modal.hidden=true; document.body.classList.remove('rk-modal-open'); } }
-    });
-})();
-</script>
-HTML;
-        $cardsHtml = '<div class="recojos-mobile-groups">' . implode('', $parts) . '</div>' . $modalHtml;
->>>>>>> 9c6b0b929818f37fddb7b5cbfd96b736d2b9bec2
 }
 // Salida combinada: ambos bloques, CSS ocultará según ancho
 echo ($html ?: '<p>Sin resultados.</p>') . $cardsHtml;
