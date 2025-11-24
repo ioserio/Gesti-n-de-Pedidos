@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/require_login.php';
+require_once __DIR__ . '/init.php';
 // Resumen de cobranzas por vendedor (responsable)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);

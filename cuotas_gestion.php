@@ -1,12 +1,13 @@
 <?php
 require_once __DIR__ . '/require_login.php';
+require_once __DIR__ . '/init.php';
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
 <title>Gestión de Cuotas</title>
-<link rel="stylesheet" href="estilos.css" />
+<link rel="stylesheet" href="estilos.css?v=<?php echo $assetVersion; ?>" />
 <style>
 .cuotas-wrap{max-width:1000px;margin:20px auto;padding:16px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.08);border-radius:8px;font-family:Arial,sans-serif;}
 .cuotas-wrap h1{margin:0 0 12px;font-size:24px;color:#222;}

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/require_login.php';
+require_once __DIR__ . '/init.php';
 require_once 'conexion.php';
 
 $fecha = isset($_GET['fecha']) ? $_GET['fecha'] : date('Y-m-d');
