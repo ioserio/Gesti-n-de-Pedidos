@@ -100,12 +100,15 @@
                         <li><a href="#" data-mod="sesiones" onclick="mostrarModulo('sesiones')">Usuarios en línea</a></li>
                     </ul>
                 </li>
-                <li id="user-info" class="push-right"><a href="#" tabindex="-1" style="opacity:.95; cursor:default;">
-                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
-                    <span id="user-name">Cargando...</span>
-                </a></li>
-                <li><a href="logout.php"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 17v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-6a2 2 0 0 0-2 2v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 12H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Salir</a></li>
+                <li class="logout-desktop"><a href="logout.php"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 17v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-6a2 2 0 0 0-2 2v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 12H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Salir</a></li>
             </ul>
+            <!-- Usuario (fuera del menú para que no aparezca como item en móviles) -->
+            <div id="user-info" class="user-info" aria-label="Usuario actual">
+                <span id="user-name" tabindex="0" style="cursor:pointer;">Cargando...</span>
+                <div id="user-menu" class="user-menu" style="display:none;">
+                    <a href="logout.php">Salir</a>
+                </div>
+            </div>
         </nav>
     </header>
     <!-- Panel de menú móvil (clonado vía JS de la lista principal) -->
@@ -390,6 +393,6 @@
         </div>
     </section>
     </div>
-    <script src="script.js"></script>
+    <script src="script.js?v=mobile1"></script>
 </body>
 </html>

@@ -1140,6 +1140,29 @@ document.addEventListener('DOMContentLoaded', function(){
             if (tgt) {
                 const nom = (info.nombre && info.nombre.trim()) ? info.nombre.trim() : (info.usuario || '');
                 tgt.textContent = nom ? `Hola, ${nom}` : '';
+                        tgt.textContent = nom ? `Hola,\n${nom}` : '';
+                    }
+            // Menú desplegable usuario
+            const userMenu = document.getElementById('user-menu');
+            if (tgt && userMenu) {
+                function toggleMenu(show) {
+                    userMenu.style.display = show ? 'block' : 'none';
+                }
+                tgt.addEventListener('click', function(e){
+                    e.stopPropagation();
+                    toggleMenu(userMenu.style.display !== 'block');
+                });
+                tgt.addEventListener('keydown', function(e){
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleMenu(userMenu.style.display !== 'block');
+                    }
+                });
+                document.addEventListener('click', function(e){
+                    if (!userMenu.contains(e.target) && e.target !== tgt) {
+                        toggleMenu(false);
+                    }
+                });
             }
             // Guardar id de usuario actual globalmente
             window.__CURRENT_USER_ID = info.id || 0;
