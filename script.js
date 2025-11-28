@@ -1,3 +1,35 @@
+// Anti-cache global para todas las peticiones fetch: agrega _ts y headers no-cache
+(function(){
+    const BUILD_TS = Date.now();
+    const origFetch = window.fetch;
+    if (typeof origFetch === 'function') {
+        window.fetch = function(input, init){
+            try {
+                let url = (typeof input === 'string') ? input : (input && input.url ? input.url : '');
+                if (url && url.indexOf('_ts=') === -1 && !url.startsWith('data:')) {
+                    const sep = url.indexOf('?') === -1 ? '?' : '&';
+                    url += sep + '_ts=' + BUILD_TS;
+                    if (typeof input === 'string') {
+                        input = url;
+                    } else {
+                        input = new Request(url, input);
+                    }
+                }
+                if (!init) init = {};
+                if (!init.headers) init.headers = {};
+                if (init.headers instanceof Headers) {
+                        init.headers.set('Cache-Control','no-cache');
+                        init.headers.set('Pragma','no-cache');
+                } else {
+                        init.headers['Cache-Control'] = 'no-cache';
+                        init.headers['Pragma'] = 'no-cache';
+                }
+            } catch(e) { /* silencioso */ }
+            return origFetch.call(this, input, init);
+        };
+    }
+})();
+
 // Función para poner la fecha de hoy en el input de resumen
 function setFechaHoyResumen() {
     const fechaInput = document.getElementById('fecha_resumen');
@@ -297,11 +329,15 @@ async function postJSON(url, payload){
 function cargarResumen(fecha) {
     const resumen = document.getElementById('resumen');
     const supervisor = document.getElementById('supervisor_resumen') ? document.getElementById('supervisor_resumen').value : '';
+    const groupSup = document.getElementById('group_sup_resumen') ? document.getElementById('group_sup_resumen').checked : false;
     if (resumen) {
         resumen.innerHTML = '<p>Cargando...</p>';
         let url = 'resumen_pedidos.php?fecha=' + encodeURIComponent(fecha);
         if (supervisor) {
             url += '&supervisor=' + encodeURIComponent(supervisor);
+        }
+        if (groupSup) {
+            url += '&group_supervisor=1';
         }
         fetch(url)
             .then(res => res.text())
@@ -353,6 +389,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const supervisorSelect = document.getElementById('supervisor_resumen');
         if (supervisorSelect) {
             supervisorSelect.addEventListener('change', function() {
+                const fecha = document.getElementById('fecha_resumen').value;
+                cargarResumen(fecha);
+                try { cargarUltimaActualizacion(); } catch(_) {}
+            });
+        }
+        const groupSupChk = document.getElementById('group_sup_resumen');
+        if (groupSupChk) {
+            groupSupChk.addEventListener('change', function(){
                 const fecha = document.getElementById('fecha_resumen').value;
                 cargarResumen(fecha);
                 try { cargarUltimaActualizacion(); } catch(_) {}

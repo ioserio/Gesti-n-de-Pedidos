@@ -167,7 +167,7 @@
     </section>
     <section id="modulo-resumen" style="display:none;">
         <h2>Resumen de Pedidos por Vendedor</h2>
-    <form id="form-resumen" style="margin-bottom:20px; display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+        <form id="form-resumen" style="margin-bottom:20px; display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
             <label for="fecha_resumen">Fecha:</label>
             <input type="date" id="fecha_resumen" name="fecha_resumen" value="" required>
             <label for="supervisor_resumen" style="margin-left:15px;"><b>Supervisor:</b></label>
@@ -179,6 +179,10 @@
                 <option value="FRANCISCO">FRANCISCO</option>
                 <option value="OFICINA">OFICINA</option>
             </select>
+            <label style="display:inline-flex; align-items:center; gap:6px;">
+                <input type="checkbox" id="group_sup_resumen">
+                Ver por mesa (Supervisor)
+            </label>
             <button type="submit">Consultar</button>
             <span id="ultima_actualizacion" style="margin-left:auto; color:#555; font-weight:600; white-space:nowrap;"></span>
         </form>
@@ -393,6 +397,6 @@
         </div>
     </section>
     </div>
-    <script src="script.js?v=mobile1"></script>
+    <script src="script.js?v=mobile3"></script>
 </body>
 </html>

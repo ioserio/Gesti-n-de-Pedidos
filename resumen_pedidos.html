@@ -17,7 +17,7 @@
 <body>
     <div class="container">
         <h2>Resumen de Pedidos por Vendedor (Hoy)</h2>
-        <div style="margin-bottom:12px;">
+        <div style="margin-bottom:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <label for="filtroSupervisor"><b>Supervisor:</b></label>
             <select id="filtroSupervisor">
                 <option value="">Todos</option>
@@ -27,6 +27,10 @@
                 <option value="FRANCISCO">FRANCISCO</option>
                 <option value="OFICINA">OFICINA</option>
             </select>
+            <label style="display:inline-flex; align-items:center; gap:6px;">
+                <input type="checkbox" id="chkMesa">
+                Ver por mesa (Supervisor)
+            </label>
         </div>
         <div id="resumen"></div>
     </div>
@@ -34,9 +38,13 @@
     // Cargar el resumen vía AJAX con filtro de supervisor
     function cargarResumen() {
         const supervisor = document.getElementById('filtroSupervisor').value;
+        const mesa = document.getElementById('chkMesa').checked;
         let url = 'resumen_pedidos.php';
         if (supervisor) {
             url += '?supervisor=' + encodeURIComponent(supervisor);
+        }
+        if (mesa) {
+            url += (url.indexOf('?') === -1 ? '?' : '&') + 'group_supervisor=1';
         }
         fetch(url)
             .then(res => res.text())
@@ -55,6 +63,7 @@
 
     window.onload = function() {
         document.getElementById('filtroSupervisor').addEventListener('change', cargarResumen);
+        document.getElementById('chkMesa').addEventListener('change', cargarResumen);
         cargarResumen();
         applyMobileFlag();
         window.addEventListener('resize', applyMobileFlag);
