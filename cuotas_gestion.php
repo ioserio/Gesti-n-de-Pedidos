@@ -41,6 +41,11 @@ require_once __DIR__ . '/init.php';
   <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
     <button type="button" id="btn-add-mass" style="background:#28a745;">Agregar cuotas</button>
     <button type="button" id="btn-save-mass" style="background:#17a2b8;">Guardar cambios</button>
+    <button type="button" id="btn-download-template" style="background:#6c757d;">Descargar plantilla Excel</button>
+    <label style="display:inline-flex; align-items:center; gap:8px; font-size:12px; color:#333;">
+      <input type="file" id="excel-file" accept=".xlsx,.xls" />
+      <button type="button" id="btn-upload-excel" style="background:#ff9800;">Subir cuotas desde Excel</button>
+    </label>
     <span id="mass-msg" style="font-size:12px; color:#555;"></span>
   </div>
   <div id="cuotas-msg"></div>
@@ -238,6 +243,30 @@ function buildMassTemplate(){
 }
 
 if (btnAddMass) btnAddMass.addEventListener('click', buildMassTemplate);
+
+// Descargar plantilla Excel
+const btnDownloadTemplate = document.getElementById('btn-download-template');
+if (btnDownloadTemplate) btnDownloadTemplate.addEventListener('click', function(){
+  window.location.href = 'cuotas_excel.php?action=template';
+});
+
+// Subir Excel y procesar
+const btnUploadExcel = document.getElementById('btn-upload-excel');
+const excelInput = document.getElementById('excel-file');
+if (btnUploadExcel) btnUploadExcel.addEventListener('click', function(){
+  if (!excelInput || !excelInput.files || !excelInput.files[0]) { massMsg.textContent = 'Seleccione un archivo Excel (.xlsx).'; return; }
+  const fd = new FormData();
+  fd.append('file', excelInput.files[0]);
+  massMsg.textContent = 'Procesando Excel...';
+  fetch('cuotas_excel.php?action=upload', { method:'POST', body: fd })
+    .then(r=>r.json())
+    .then(j => {
+      if (!j || j.ok !== true) { throw new Error(j && j.error || 'Error'); }
+      massMsg.textContent = 'Excel procesado. Guardadas: ' + j.saved + '. Omitidas: ' + j.skipped + '. Actualizando lista...';
+      loadCuotas();
+    })
+    .catch(err => { massMsg.textContent = 'Error: ' + (err && err.message ? err.message : ''); });
+});
 
 if (btnSaveMass) btnSaveMass.addEventListener('click', function(){
   const rows = Array.from(document.querySelectorAll('#mass-table .mass-row'));
