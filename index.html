@@ -128,6 +128,30 @@
 
         <hr style="margin:24px 0;">
 
+        <h2>Subir Clientes (Excel/CSV)</h2>
+        <p>Selecciona tu cartera para cargarla en <code>clientes</code>. La primera fila debe contener cabeceras exactas (ej: <code>Codigo</code>, <code>Nombre</code>, <code>RUC</code>, <code>DocIdentidad</code>, etc.). Para archivos grandes, se recomienda <b>CSV</b>.</p>
+        <form action="procesar_clientes.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
+            <input type="file" name="archivo_clientes" accept=".xlsx,.xls,.csv" required>
+            <label style="margin-left:14px; display:inline-flex; align-items:center; gap:6px;">
+                <input type="checkbox" name="truncate" value="1">
+                Vaciar tabla antes de importar
+            </label>
+            <button type="submit" style="margin-left:14px;">Subir Clientes</button>
+        </form>
+        <p style="font-size:12px; color:#666; margin-top:8px;">Para CSV usa el botón "Subir Clientes (CSV)" de abajo; es más liviano y adecuado para archivos grandes.</p>
+
+        <!-- Alternativa CSV directa (opcional) -->
+        <form action="procesar_clientes_csv.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
+            <input type="file" name="archivo_clientes" accept=".csv">
+            <label style="margin-left:14px; display:inline-flex; align-items:center; gap:6px;">
+                <input type="checkbox" name="truncate" value="1">
+                Vaciar tabla antes de importar
+            </label>
+            <button type="submit" style="margin-left:14px;">Subir Clientes (CSV)</button>
+        </form>
+
+        <hr style="margin:24px 0;">
+
         <h2>Subir Excel de Devoluciones por Cliente</h2>
         <p>Selecciona tu archivo <b>DEVOLUCIONES POR CLIENTE.xlsx</b> para cargarlo en la tabla <code>devoluciones_por_cliente</code>.</p>
         <form action="procesar_devoluciones.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
