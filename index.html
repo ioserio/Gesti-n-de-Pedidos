@@ -251,18 +251,21 @@
     <!-- Módulo Almacén: placeholder inicial -->
     <section id="modulo-almacen" style="display:none;">
         <h2>Almacén</h2>
-        <p style="color:#555;">Carga tu hoja de moldes (XLS/XLSX) para que el equipo de almacén pueda digitar el peso real desde la web o el celular. La columna AG (camión) se puede llenar mediante un archivo de mapeo CODIGO→CAMION.</p>
+        <p style="color:#555;">Carga tu hoja de moldes (XLS/XLSX) para que el equipo de almacén pueda digitar el peso real. El mapeo <b>CÓDIGO→CAMIÓN</b> ahora se sube por separado y se guarda en su propia tabla.</p>
+        <!-- Importación independiente: Hoja de moldes -->
         <form action="almacen_import.php" method="post" enctype="multipart/form-data" style="margin:10px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <input type="hidden" name="action" value="moldes">
             <label>Fecha: <input type="date" name="fecha" id="alm_fecha" required></label>
             <label>Hoja de moldes (XLS/XLSX): <input type="file" name="xls" accept=".xls,.xlsx" required></label>
-            <label>Mapeo CODIGO→CAMIÓN (XLSX): <input type="file" name="map_camion" accept=".xlsx"></label>
             <label style="display:inline-flex; align-items:center; gap:6px;"><input type="checkbox" name="truncate" value="1">Reemplazar registros de esa fecha</label>
-            <button type="submit">Importar</button>
+            <button type="submit">Importar moldes</button>
         </form>
-        <details style="margin-bottom:10px;">
-            <summary>Opcional: Mapeo CODIGO→CAMION</summary>
-            <div style="margin-top:8px; font-size:12px; color:#666;">También puedes adjuntar el mapeo en el formulario principal de importación.</div>
-        </details>
+
+        <!-- Importación independiente: Mapeo CODIGO→CAMIÓN -->
+        <form action="almacen_import.php?action=map" method="post" enctype="multipart/form-data" style="margin:10px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <label>Mapeo CODIGO→CAMIÓN (XLS/XLSX): <input type="file" name="map_camion" accept=".xls,.xlsx" required></label>
+            <button type="submit">Importar mapeo</button>
+        </form>
         <hr style="margin:16px 0;">
         <form id="alm-list-form" style="margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <label>Fecha: <input type="date" id="alm_list_fecha" required></label>

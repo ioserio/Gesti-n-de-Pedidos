@@ -481,15 +481,17 @@ function cargarAlmacen(){
         fetch('almacen_api.php?action=list&'+qs.toString())
             .then(r=>r.text()).then(html=>{
                 cont.innerHTML = html;
-                // delegar guardado
-                // Auto-guardar al cambiar P.Real
+                // delegar guardado: P.Real y Observación
                 cont.addEventListener('change', function(e){
-                        const inp = e.target.closest('.alm-prea');
-                        if (!inp) return;
+                        const isPrea = !!e.target.closest('.alm-prea');
+                        const isObs  = !!e.target.closest('.alm-obs');
+                        if (!isPrea && !isObs) return;
+                        const inp = e.target;
                         const tr = inp.closest('tr'); if (!tr) return;
                         const id = tr.getAttribute('data-id');
                         const val = inp.value || '';
-                        const fd = new FormData(); fd.append('action','save'); fd.append('id', id); fd.append('p_rea', val);
+                        const fd = new FormData(); fd.append('action','save'); fd.append('id', id);
+                        if (isPrea) fd.append('p_rea', val); else fd.append('observacion', val);
                         fetch('almacen_api.php', { method:'POST', body: fd })
                             .then(r=>r.json()).then(d=>{ if (d && d.ok) { inp.style.background='#e8f5e9'; setTimeout(()=>{inp.style.background='';}, 800); } else { alert('No se pudo guardar'); } })
                             .catch(()=>alert('Error'));
