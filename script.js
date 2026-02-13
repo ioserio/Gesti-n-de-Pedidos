@@ -111,6 +111,7 @@ window.mostrarModulo = function(modulo) {
             'usuarios':'usuarios',
             'permisos':'permisos',
             'sesiones':'usuarios',
+            'almacen':'almacen',
             'inicio': null
         };
         if (modulo && map.hasOwnProperty(modulo) && map[modulo]) {
@@ -153,6 +154,8 @@ window.mostrarModulo = function(modulo) {
         if (permisos) permisos.style.display = (modulo === 'permisos') ? 'block' : 'none';
         const sesiones = document.getElementById('modulo-sesiones');
         if (sesiones) sesiones.style.display = (modulo === 'sesiones') ? 'block' : 'none';
+        const almacen = document.getElementById('modulo-almacen');
+        if (almacen) almacen.style.display = (modulo === 'almacen') ? 'block' : 'none';
         // Detener auto-refresh de sesiones al salir del módulo
         if (modulo !== 'sesiones' && window.__SESSIONS_TIMER) {
             clearInterval(window.__SESSIONS_TIMER);
@@ -225,6 +228,8 @@ window.mostrarModulo = function(modulo) {
                 const ses = document.getElementById('modulo-sesiones');
                 if (ses && ses.style.display !== 'none') cargarSesiones();
             }, 30000);
+        } else if (modulo === 'almacen') {
+            setTimeout(function(){ initAlmacen(); }, 50);
     }
 }
 
@@ -451,6 +456,47 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Almacén: inicialización y carga
+function setFechaHoyAlmacen(){
+        const val = new Date().toISOString().slice(0,10);
+        const a1 = document.getElementById('alm_fecha'); if (a1) a1.value = val;
+        const a2 = document.getElementById('alm_fecha_map'); if (a2) a2.value = val;
+        const a3 = document.getElementById('alm_list_fecha'); if (a3) a3.value = val;
+}
+function initAlmacen(){
+        setFechaHoyAlmacen();
+        const form = document.getElementById('alm-list-form');
+        if (form && !form.__wired){
+                form.__wired = true;
+                form.addEventListener('submit', function(e){ e.preventDefault(); cargarAlmacen(); });
+        }
+        cargarAlmacen();
+}
+function cargarAlmacen(){
+        const cont = document.getElementById('almacen-lista'); if (!cont) return;
+        cont.innerHTML = '<p>Cargando...</p>';
+        const fecha = document.getElementById('alm_list_fecha')?.value || '';
+        const qs = new URLSearchParams(); if (fecha) qs.set('fecha', fecha);
+        fetch('almacen_api.php?action=list&'+qs.toString())
+            .then(r=>r.text()).then(html=>{
+                cont.innerHTML = html;
+                // delegar guardado
+                // Auto-guardar al cambiar P.Real
+                cont.addEventListener('change', function(e){
+                        const inp = e.target.closest('.alm-prea');
+                        if (!inp) return;
+                        const tr = inp.closest('tr'); if (!tr) return;
+                        const id = tr.getAttribute('data-id');
+                        const val = inp.value || '';
+                        const fd = new FormData(); fd.append('action','save'); fd.append('id', id); fd.append('p_rea', val);
+                        fetch('almacen_api.php', { method:'POST', body: fd })
+                            .then(r=>r.json()).then(d=>{ if (d && d.ok) { inp.style.background='#e8f5e9'; setTimeout(()=>{inp.style.background='';}, 800); } else { alert('No se pudo guardar'); } })
+                            .catch(()=>alert('Error'));
+                });
+            })
+            .catch(()=>{ cont.innerHTML = '<p>Error al cargar Almacén.</p>'; });
+}
 
 // Devoluciones: cargar listado
 function cargarDevoluciones(){

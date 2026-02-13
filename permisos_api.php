@@ -20,6 +20,7 @@ $MODULES = [
     'ctacte_vendedor' => 'CTACTE/Vendedor',
     'usuarios'        => 'Usuarios',
     'permisos'        => 'Permisos',
+    'almacen'         => 'Almacén',
 ];
 
 $action = $_GET['action'] ?? ($_POST['action'] ?? 'list');
