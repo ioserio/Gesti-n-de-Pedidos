@@ -100,14 +100,14 @@ if ($action === 'list') {
         }
 
         foreach ($groups as $g) {
-            echo '<div style="display:flex; align-items:baseline; gap:12px; margin-top:16px; margin-bottom:6px;">'
+            echo '<div class="almacen-group-head" style="display:flex; align-items:baseline; gap:12px; margin-top:16px; margin-bottom:6px;">'
                 .'<strong>' . h($g['nombre']) . '</strong>'
                 .'<span style="color:#777">[' . h($g['codigo']) . ']</span>'
                 .'<span style="margin-left:auto; color:#333">MOL ' . number_format($g['total_cant'], 0, '.', ',') . '</span>'
                 .'</div>';
 
-            echo '<table><thead><tr>'
-                .'<th>N° Pedido</th><th>Vendedor</th><th>Cliente código</th><th>Cliente</th><th>Unidad</th><th>Cant.</th><th>P.Pro</th><th>P.Real</th><th>Camión</th><th>Observación</th>'
+            echo '<table class="almacen-table"><thead><tr>'
+                .'<th>N.Ped</th><th>Vd</th><th>Cli Cod</th><th>Cliente</th><th>Uni</th><th>Cant</th><th>P.Pro</th><th>P.Real</th><th>Cam</th><th>Obs</th>'
                 .'</tr></thead><tbody>';
 
             foreach ($g['rows'] as $row) {
@@ -116,16 +116,16 @@ if ($action === 'list') {
                 $pPro = isset($row['p_pro']) ? (float)$row['p_pro'] : null;
                 $pRea = isset($row['p_rea']) ? (float)$row['p_rea'] : null;
                 echo '<tr data-id="'.$id.'">'
-                    .'<td>'.h($row['pedido_numero']).'</td>'
-                    .'<td>'.h($row['cod_vendedor']).'</td>'
-                    .'<td>'.h($row['cliente_codigo']).'</td>'
-                    .'<td>'.h($row['cliente_nombre']).'</td>'
-                    .'<td>'.h($row['unidad']).'</td>'
-                    .'<td>'.($cant!==null?number_format($cant,2,'.',','):'').'</td>'
-                    .'<td>'.($pPro!==null?number_format($pPro,2,'.',','):'').'</td>'
-                    .'<td><input type="number" step="0.01" min="0" class="alm-prea" value="'.($pRea!==null?htmlspecialchars((string)$pRea,ENT_QUOTES,'UTF-8'):'').'" style="width:100px"></td>'
-                    .'<td>'.h($row['camion_resolved']).'</td>'
-                    .'<td><input type="text" class="alm-obs" value="'.h($row['observacion']).'" style="width:180px"></td>'
+                    .'<td data-label="N° Pedido">'.h($row['pedido_numero']).'</td>'
+                    .'<td data-label="Vendedor">'.h($row['cod_vendedor']).'</td>'
+                    .'<td data-label="Cliente código">'.h($row['cliente_codigo']).'</td>'
+                    .'<td data-label="Cliente">'.h($row['cliente_nombre']).'</td>'
+                    .'<td data-label="Unidad">'.h($row['unidad']).'</td>'
+                    .'<td data-label="Cant.">'.($cant!==null?number_format($cant,2,'.',','):'').'</td>'
+                    .'<td data-label="P.Pro">'.($pPro!==null?number_format($pPro,2,'.',','):'').'</td>'
+                    .'<td data-label="P.Real"><input type="number" step="0.01" min="0" class="alm-prea" value="'.($pRea!==null?htmlspecialchars((string)$pRea,ENT_QUOTES,'UTF-8'):'').'" style="width:100px"></td>'
+                    .'<td data-label="Camión">'.h($row['camion_resolved']).'</td>'
+                    .'<td data-label="Observación"><input type="text" class="alm-obs" value="'.h($row['observacion']).'" style="width:180px"></td>'
                     .'</tr>';
             }
             echo '</tbody></table>';

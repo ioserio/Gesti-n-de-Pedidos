@@ -635,3 +635,156 @@ th {
 .rk-modal-meta { display:grid; grid-template-columns: 1fr; gap:6px; margin-bottom:8px; font-size:13px; color:#374151; }
 .rk-modal-detail .rk-drow { padding:8px 2px; }
 @media (max-width: 480px) { .rk-modal { max-height:88vh; } }
+
+/* =====================
+   Almacén: vista responsive
+   ===================== */
+/* Formularios de Almacén: que se apilen en móviles */
+@media (max-width: 700px) {
+    #modulo-almacen form {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    #modulo-almacen form label {
+        width: 100%;
+    }
+    #modulo-almacen form input[type="file"],
+    #modulo-almacen form input[type="date"],
+    #modulo-almacen form button {
+        width: 100%;
+        box-sizing: border-box;
+    }
+}
+
+/* Cabeceras de grupo de producto en Almacén */
+#modulo-almacen .almacen-group-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+}
+
+/* Tablas de Almacén en móviles: tabla compacta sin scroll horizontal */
+@media (max-width: 700px) {
+    #modulo-almacen {
+        overflow-x: hidden;
+    }
+    #modulo-almacen .almacen-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        display: table;           /* anula display:block global */
+        min-width: 0;             /* anula min-width global */
+        overflow-x: visible;      /* evita barra horizontal */
+        white-space: normal;      /* permite saltos de línea */
+        font-size: 12px;
+        table-layout: fixed;
+    }
+    #modulo-almacen .almacen-table thead {
+        display: table-header-group;
+    }
+    #modulo-almacen .almacen-table tbody {
+        display: table-row-group;
+    }
+    #modulo-almacen .almacen-table tr {
+        display: table-row;
+    }
+    #modulo-almacen .almacen-table th,
+    #modulo-almacen .almacen-table td {
+        padding: 4px;
+        white-space: normal;
+    }
+
+    /* Distribución porcentual de columnas para que todas quepan (N.Ped, Vd, Cli Cod, Cliente, Cant, P.Real, Cam, Obs) */
+    /* N.Ped */
+    #modulo-almacen .almacen-table th:first-child,
+    #modulo-almacen .almacen-table td:first-child {
+        min-width: 0;
+        width: 14%;
+        white-space: nowrap;
+    }
+    /* Vd */
+    #modulo-almacen .almacen-table th:nth-child(2),
+    #modulo-almacen .almacen-table td:nth-child(2) {
+        width: 7%;
+        white-space: nowrap;
+    }
+    /* Cli Cod */
+    #modulo-almacen .almacen-table th:nth-child(3),
+    #modulo-almacen .almacen-table td:nth-child(3) {
+        width: 9%;
+        white-space: nowrap;
+    }
+    /* Cliente (texto puede romperse) */
+    #modulo-almacen .almacen-table th:nth-child(4),
+    #modulo-almacen .almacen-table td:nth-child(4) {
+        width: 30%;
+        min-width: 120px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        text-align: left;
+    }
+    /* Cant */
+    #modulo-almacen .almacen-table th:nth-child(6),
+    #modulo-almacen .almacen-table td:nth-child(6) {
+        width: 7%;
+        text-align: right;
+        white-space: nowrap;
+    }
+    /* P.Real */
+    #modulo-almacen .almacen-table th:nth-child(8),
+    #modulo-almacen .almacen-table td:nth-child(8) {
+        width: 7%;
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    /* Input de P.Real aún más compacto (aprox. la mitad del ancho original) */
+    #modulo-almacen .almacen-table td:nth-child(8) input[type="number"] {
+        width: 38px;
+        max-width: 38px;
+        padding-right: 2px;
+    }
+
+    /* Cam */
+    #modulo-almacen .almacen-table th:nth-child(9),
+    #modulo-almacen .almacen-table td:nth-child(9) {
+        width: 7%;
+        white-space: nowrap;
+    }
+    /* Obs: texto muy corto (máx. 3 dígitos), columna más angosta */
+    #modulo-almacen .almacen-table th:nth-child(10),
+    #modulo-almacen .almacen-table td:nth-child(10) {
+        width: 10%;
+        max-width: 10%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    #modulo-almacen .almacen-table td:nth-child(10) input[type="text"] {
+        width: 38px;
+        max-width: 38px;
+        text-align: center;
+        padding-right: 2px;
+    }
+    #modulo-almacen .almacen-table td input[type="number"],
+    #modulo-almacen .almacen-table td input[type="text"] {
+        max-width: 100%;
+        box-sizing: border-box;
+        font-size: 13px;
+    }
+
+    /* Ocultar columnas menos críticas para que entren más datos sin scroll */
+    /* Columnas ocultas en móvil: Unidad (5) y P.Pro (7) */
+    #modulo-almacen .almacen-table th:nth-child(5),
+    #modulo-almacen .almacen-table td:nth-child(5),
+    #modulo-almacen .almacen-table th:nth-child(7),
+    #modulo-almacen .almacen-table td:nth-child(7) {
+        display: none;
+    }
+}
+
+/* Ajustes generales para tablas de Almacén (todas las pantallas) */
+#modulo-almacen .almacen-table td {
+    white-space: normal;
+}
