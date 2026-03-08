@@ -56,6 +56,7 @@ if ($result->num_rows > 0) {
     $total_pedidos = 0;
     $total_monto = 0;
     $total_cuota = 0.0;
+    $total_faltante = 0.0;
     $rows = [];
     while ($row = $result->fetch_assoc()) {
         // Normalizar código de vendedor y buscar supervisor por varias formas
@@ -85,25 +86,18 @@ if ($result->num_rows > 0) {
         $total_pedidos += intval($row['ctd_pedidos']);
         $total_monto += floatval($row['total_igv']);
         $total_cuota += $cuotaVal;
+        $total_faltante += max(0, $cuotaVal - (float)$row['total_igv']);
         $rows[] = $row;
     }
-    echo '<table class="resumen-desktop">';
-    echo '<tr><th colspan="' . ($groupSup ? '5' : '7') . '" style="text-align:left; background:#e6f2ff; font-size:17px;">';
-    echo 'Pedidos totales: <b>' . $total_pedidos . '</b> &nbsp;|&nbsp; Monto total S/ <b>' . number_format($total_monto, 2, '.', ',') . '</b>';
-    $pctGlobalRaw = $total_cuota > 0 ? (($total_monto / $total_cuota) * 100) : 0;
-    $pctGlobal = ($pctGlobalRaw < 100) ? floor($pctGlobalRaw) : round($pctGlobalRaw);
-    $pctGlobalCap = max(0, min(100, $pctGlobal));
-    $gBarClass = 'bar-red';
-    if ($pctGlobal >= 100) { $gBarClass = 'bar-green'; }
-    elseif ($pctGlobal >= 80) { $gBarClass = 'bar-yellow'; }
-    elseif ($pctGlobal >= 50) { $gBarClass = 'bar-orange'; }
-    echo ' &nbsp;|&nbsp; Cuota total S/ <b>' . number_format($total_cuota, 2, '.', ',') . '</b> &nbsp;|&nbsp; Avance <b>' . $pctGlobal . '%</b>';
-    echo ' <span class="progress progress-global"><span class="bar ' . $gBarClass . '" style="width:' . $pctGlobalCap . '%"></span></span>';
-    echo ' &nbsp; <button onclick="window.print()" style="float:right; background:#007bff; color:#fff; border:none; padding:6px 16px; border-radius:4px; cursor:pointer; font-size:15px;">Imprimir PDF</button>';
-    echo '</th></tr>';
+
+    // Faltante total NETO: debe considerar toda la venta (incluida OFICINA)
+    // y compensar sobrecumplimientos entre vendedores/mesas.
+    // Formula: max(0, cuota_total - monto_total).
+    $total_faltante_view = max(0, $total_cuota - $total_monto);
+
+    // Construir grupos para la vista por mesa.
+    $groups = [];
     if ($groupSup) {
-        // Agrupar por supervisor
-        $groups = [];
         foreach ($rows as $row) {
             $supKey = $row['Supervisor'] ?: 'SIN SUPERVISOR';
             if (!isset($groups[$supKey])) {
@@ -111,17 +105,49 @@ if ($result->num_rows > 0) {
                     'Supervisor' => $supKey,
                     'ctd_pedidos' => 0,
                     'total_igv' => 0.0,
-                    'cuota' => 0.0
+                    'cuota' => 0.0,
+                    'faltante' => 0.0,
                 ];
             }
             $groups[$supKey]['ctd_pedidos'] += intval($row['ctd_pedidos']);
             $groups[$supKey]['total_igv'] += floatval($row['total_igv']);
             $groups[$supKey]['cuota'] += floatval(isset($row['CuotaVal']) ? $row['CuotaVal'] : 0.0);
         }
-        echo '<tr><th>Supervisor</th><th>Ctd_Pedidos</th><th>Total_IGV</th><th>Cuota (S/)</th><th>Avance</th></tr>';
+        foreach ($groups as $k => $g) {
+            $falt = max(0, (float)$g['cuota'] - (float)$g['total_igv']);
+            $groups[$k]['faltante'] = $falt;
+        }
+    }
+
+    echo '<div class="resumen-table-wrap">';
+    echo '<table class="resumen-desktop">';
+    echo '<tr><th colspan="' . ($groupSup ? '6' : '8') . '" class="resumen-top-cell">';
+    $pctGlobalRaw = $total_cuota > 0 ? (($total_monto / $total_cuota) * 100) : 0;
+    $pctGlobal = ($pctGlobalRaw < 100) ? floor($pctGlobalRaw) : round($pctGlobalRaw);
+    $pctGlobalCap = max(0, min(100, $pctGlobal));
+    $gBarClass = 'bar-red';
+    if ($pctGlobal >= 100) { $gBarClass = 'bar-green'; }
+    elseif ($pctGlobal >= 80) { $gBarClass = 'bar-yellow'; }
+    elseif ($pctGlobal >= 50) { $gBarClass = 'bar-orange'; }
+    echo '<div class="resumen-top-row">';
+    echo '<div class="resumen-kpis">';
+    echo '<span class="kpi-chip kpi-pedidos">Pedidos: <b>' . $total_pedidos . '</b></span>';
+    echo '<span class="kpi-chip kpi-monto">Venta S/ <b>' . number_format($total_monto, 2, '.', ',') . '</b></span>';
+    echo '<span class="kpi-chip kpi-cuota">Cuota S/ <b>' . number_format($total_cuota, 2, '.', ',') . '</b></span>';
+    echo '<span class="kpi-chip kpi-faltante">Faltante S/ <b>' . number_format($total_faltante_view, 2, '.', ',') . '</b></span>';
+    echo '</div>';
+    echo '<div class="resumen-avance-block">';
+    echo '<span class="kpi-chip kpi-avance">Avance <b>' . $pctGlobal . '%</b></span>';
+    echo '<span class="kpi-progress-wrap"><span class="progress progress-global"><span class="bar ' . $gBarClass . '" style="width:' . $pctGlobalCap . '%"></span></span></span>';
+    echo '</div>';
+    echo '</div>';
+    echo '</th></tr>';
+    if ($groupSup) {
+        echo '<tr><th>Supervisor</th><th>Ctd_Pedidos</th><th>Total_IGV</th><th>Cuota (S/)</th><th>Faltante (S/)</th><th>Avance</th></tr>';
         foreach ($groups as $g) {
             $ventaVal = (float)$g['total_igv'];
             $cuotaVal = (float)$g['cuota'];
+            $faltanteVal = (float)$g['faltante'];
             $pctRaw = $cuotaVal > 0 ? (($ventaVal / $cuotaVal) * 100) : 0;
             $pct = ($pctRaw < 100) ? floor($pctRaw) : round($pctRaw);
             $pctCap = max(0, min(100, $pct));
@@ -134,21 +160,24 @@ if ($result->num_rows > 0) {
             echo '<td>' . htmlspecialchars($g['ctd_pedidos']) . '</td>';
             echo '<td>' . number_format($ventaVal, 2, '.', ',') . '</td>';
             echo '<td>' . number_format($cuotaVal, 2, '.', ',') . '</td>';
+            echo '<td>' . number_format($faltanteVal, 2, '.', ',') . '</td>';
             echo '<td class="avance-cell"><div class="progress"><div class="bar ' . $barClass . '" style="width:' . $pctCap . '%"></div></div><small>' . $pct . '%</small></td>';
             echo '</tr>';
         }
-        echo '</table>';
+        echo '</table></div>';
     } else {
-        echo '<tr><th>Cod_Vendedor</th><th>Nom_Vendedor</th><th>Supervisor</th><th>Ctd_Pedidos</th><th>Total_IGV</th><th>Cuota (S/)</th><th>Avance</th></tr>';
+        echo '<tr><th>Cod_Vendedor</th><th>Nom_Vendedor</th><th>Supervisor</th><th>Ctd_Pedidos</th><th>Total_IGV</th><th>Cuota (S/)</th><th>Faltante (S/)</th><th>Avance</th></tr>';
         foreach ($rows as $row) {
             echo '<tr>';
             echo '<td>' . htmlspecialchars($row['Cod_Vendedor']) . '</td>';
             echo '<td>' . htmlspecialchars($row['Nom_Vendedor']) . '</td>';
             echo '<td>' . htmlspecialchars($row['Supervisor']) . '</td>';
             $cuotaVal = isset($row['CuotaVal']) ? (float)$row['CuotaVal'] : 0.0;
+            $faltanteVal = max(0, $cuotaVal - (float)$row['total_igv']);
             echo '<td>' . htmlspecialchars($row['ctd_pedidos']) . '</td>';
             echo '<td>' . number_format($row['total_igv'], 2, '.', ',') . '</td>';
             echo '<td>' . number_format($cuotaVal, 2, '.', ',') . '</td>';
+            echo '<td>' . number_format($faltanteVal, 2, '.', ',') . '</td>';
             $ventaVal = (float)$row['total_igv'];
             $pctRaw = $cuotaVal > 0 ? (($ventaVal / $cuotaVal) * 100) : 0;
             $pct = ($pctRaw < 100) ? floor($pctRaw) : round($pctRaw);
@@ -160,7 +189,7 @@ if ($result->num_rows > 0) {
             echo '<td class="avance-cell"><div class="progress"><div class="bar ' . $barClass . '" style="width:' . $pctCap . '%"></div></div><small>' . $pct . '%</small></td>';
             echo '</tr>';
         }
-        echo '</table>';
+        echo '</table></div>';
     }
     
         // Versión móvil tipo lista con resumen global
@@ -173,6 +202,7 @@ if ($result->num_rows > 0) {
                         . '<span><strong>Pedidos:</strong> ' . $total_pedidos . '</span>'
                         . '<span><strong>Monto:</strong> S/ ' . number_format($total_monto, 2, '.', ',') . '</span>'
                         . '<span><strong>Cuota:</strong> S/ ' . number_format($total_cuota, 2, '.', ',') . '</span>'
+                        . '<span><strong>Faltante:</strong> S/ ' . number_format($total_faltante_view, 2, '.', ',') . '</span>'
                         . '<span><strong>Avance:</strong> ' . $pctGlobal . '%</span>'
                     . '</div>';
         echo   '<div class="rg-bar"><div class="rg-track"><span class="bar ' . $gBarClass . '" style="width:' . $globalBarWidth . '%"' . $globalDataSmall . '><span class="pct-in">' . $pctGlobal . '%</span></span></div></div>';
@@ -183,14 +213,12 @@ if ($result->num_rows > 0) {
         // Lista móvil agrupada por supervisor
         // Reutilizar grupos construidos arriba si existe, sino construir aquí
         $groups2 = [];
-        foreach ($rows as $row) {
-            $supKey = $row['Supervisor'] ?: 'SIN SUPERVISOR';
-            if (!isset($groups2[$supKey])) {
-                $groups2[$supKey] = [ 'ctd_pedidos' => 0, 'total_igv' => 0.0, 'cuota' => 0.0 ];
-            }
-            $groups2[$supKey]['ctd_pedidos'] += intval($row['ctd_pedidos']);
-            $groups2[$supKey]['total_igv'] += floatval($row['total_igv']);
-            $groups2[$supKey]['cuota'] += floatval(isset($row['CuotaVal']) ? $row['CuotaVal'] : 0.0);
+        foreach ($groups as $supName => $g) {
+            $groups2[$supName] = [
+                'ctd_pedidos' => (int)$g['ctd_pedidos'],
+                'total_igv' => (float)$g['total_igv'],
+                'cuota' => (float)$g['cuota']
+            ];
         }
         foreach ($groups2 as $supName => $g) {
             $ventaVal = (float)$g['total_igv'];
@@ -206,9 +234,10 @@ if ($result->num_rows > 0) {
             $label = htmlspecialchars($supName);
             $montoFmt = 'S/ ' . number_format($ventaVal, 2, '.', ',');
             $cuotaFmt = $cuotaVal > 0 ? ('S/ ' . number_format($cuotaVal, 2, '.', ',')) : '—';
+            $faltFmt = 'S/ ' . number_format(max(0, $cuotaVal - $ventaVal), 2, '.', ',');
             $pctTxt = $pct . '%';
             echo '<div class="rm-item">';
-            echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . '</div></div>';
+            echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . ' / Faltante: ' . $faltFmt . '</div></div>';
             echo   '<div class="rm-track"><span class="bar ' . $barClass . '" style="width:' . $barWidth . '%"><span class="pct-in">' . $pctTxt . '</span></span></div>';
             echo '</div>';
         }
@@ -235,9 +264,10 @@ if ($result->num_rows > 0) {
         $label = htmlspecialchars($vdPadded3 . ' - ' . $row['Nom_Vendedor']);
         $montoFmt = 'S/ ' . number_format($ventaVal, 2, '.', ',');
         $cuotaFmt = $cuotaVal > 0 ? ('S/ ' . number_format($cuotaVal, 2, '.', ',')) : '—';
+        $faltFmt = 'S/ ' . number_format(max(0, $cuotaVal - $ventaVal), 2, '.', ',');
         $pctTxt = $pct . '%';
     echo '<div class="rm-item">';
-    echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . '</div></div>';
+    echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . ' / Faltante: ' . $faltFmt . '</div></div>';
     echo   '<div class="rm-track"><span class="bar ' . $barClass . '" style="width:' . $barWidth . '%"><span class="pct-in">' . $pctTxt . '</span></span></div>';
     echo '</div>';
     }
