@@ -323,6 +323,116 @@ async function postJSON(url, payload){
     }catch(e){ return { ok:false, error: (e && e.message) ? e.message : 'Network error' }; }
 }
 
+let __importToastTimer = null;
+function ensureImportToastHost(){
+    let host = document.getElementById('import-toast-host');
+    if (host) return host;
+    host = document.createElement('div');
+    host.id = 'import-toast-host';
+    host.className = 'import-toast-host';
+    document.body.appendChild(host);
+    return host;
+}
+
+function showImportToast(message, kind){
+    const host = ensureImportToastHost();
+    const toast = document.createElement('div');
+    toast.className = 'import-toast ' + (kind === 'error' ? 'is-error' : 'is-success');
+    toast.textContent = message || (kind === 'error' ? 'No se pudo completar la importacion.' : 'Importacion completada.');
+
+    host.innerHTML = '';
+    host.appendChild(toast);
+
+    requestAnimationFrame(function(){
+        toast.classList.add('is-visible');
+    });
+
+    if (__importToastTimer) clearTimeout(__importToastTimer);
+    __importToastTimer = setTimeout(function(){
+        toast.classList.remove('is-visible');
+        setTimeout(function(){
+            if (toast.parentElement) toast.remove();
+        }, 250);
+    }, 3000);
+}
+
+function clearImportFileInputs(form){
+    form.querySelectorAll('input[type="file"]').forEach(function(input){ input.value = ''; });
+}
+
+async function submitImportFormAjax(form){
+    const action = form.getAttribute('action') || window.location.href;
+    const method = (form.getAttribute('method') || 'POST').toUpperCase();
+    const fd = new FormData(form);
+
+    const resp = await fetch(action, {
+        method: method,
+        body: fd,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    });
+
+    const ct = (resp.headers.get('content-type') || '').toLowerCase();
+    let payload = null;
+
+    if (ct.indexOf('application/json') !== -1) {
+        payload = await resp.json().catch(function(){ return null; });
+    } else {
+        const raw = await resp.text();
+        const plain = (raw || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        payload = { ok: resp.ok, message: plain };
+    }
+
+    if (!resp.ok || !payload || payload.ok !== true) {
+        const msg = (payload && payload.message) ? payload.message : ('Error al importar (HTTP ' + resp.status + ')');
+        throw new Error(msg);
+    }
+
+    showImportToast(payload.message || 'Importacion completada correctamente.', 'success');
+    clearImportFileInputs(form);
+
+    if (form.closest('#modulo-subir')) {
+        const preview = document.getElementById('preview');
+        if (preview) preview.innerHTML = '';
+    }
+    if (form.closest('#modulo-almacen')) {
+        try { cargarAlmacen(); } catch(_) {}
+    }
+}
+
+function initImportFormsAjax(){
+    const selector = '#modulo-subir form[enctype="multipart/form-data"], #modulo-almacen form[enctype="multipart/form-data"]';
+    document.querySelectorAll(selector).forEach(function(form){
+        if (form.__ajaxImportBound) return;
+        form.__ajaxImportBound = true;
+
+        form.addEventListener('submit', async function(e){
+            e.preventDefault();
+            const submitBtn = e.submitter || form.querySelector('button[type="submit"]');
+            const originalText = submitBtn ? submitBtn.textContent : '';
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Subiendo...';
+            }
+
+            try {
+                await submitImportFormAjax(form);
+            } catch (err) {
+                const msg = (err && err.message) ? err.message : 'No se pudo completar la importacion.';
+                showImportToast(msg, 'error');
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText || 'Subir';
+                }
+            }
+        });
+    });
+}
+
     function cargarUltimaActualizacion(){
         const lbl = document.getElementById('ultima_actualizacion');
         if (!lbl) return;
@@ -380,6 +490,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     applyMobileFlag();
     window.addEventListener('resize', applyMobileFlag);
+
+    initImportFormsAjax();
 
     const formResumen = document.getElementById('form-resumen');
     if (formResumen) {

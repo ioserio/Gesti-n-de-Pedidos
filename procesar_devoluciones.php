@@ -77,6 +77,19 @@ function normalizar_fecha($input) {
     return null;
 }
 
+$isAjax = (strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest')
+    || (stripos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false);
+
+function respondImport($ok, $message, $statusCode = 200, $extra = []) {
+    global $isAjax;
+    if ($isAjax) {
+        http_response_code((int)$statusCode);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(array_merge(['ok' => (bool)$ok, 'message' => (string)$message], $extra), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_devoluciones'])) {
     $tmp = $_FILES['archivo_devoluciones']['tmp_name'];
     if (!is_uploaded_file($tmp)) {
@@ -163,6 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_devoluciones
         }
 
         $mysqli->begin_transaction();
+        $insertadas = 0;
         for ($r = 1; $r < count($data); $r++) {
             $row = $data[$r];
             // Saltar filas completamente vacías
@@ -188,10 +202,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_devoluciones
                 $mysqli->rollback();
                 throw new Exception('Error insertando fila ' . $r . ': ' . $insert->error);
             }
+            $insertadas++;
         }
         $mysqli->commit();
         $insert->close();
         $mysqli->close();
+
+        respondImport(true, 'Devoluciones importadas correctamente. Filas: ' . (int)$insertadas, 200, ['rows' => (int)$insertadas]);
 
         echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=1280"><title>Devoluciones importadas</title><link rel="stylesheet" href="estilos.css"></head><body>';
         echo '<div class="container">';
@@ -201,6 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_devoluciones
         echo '</div></body></html>';
 
     } catch (Throwable $e) {
+        respondImport(false, 'Error al procesar devoluciones: ' . $e->getMessage(), 500);
         echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=1280"><title>Error</title><link rel="stylesheet" href="estilos.css"></head><body>';
         echo '<div class="container">';
         echo '<h2>Error al procesar devoluciones</h2>';
@@ -209,6 +227,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_devoluciones
         echo '</div></body></html>';
     }
 } else {
-    header('Location: index.html');
+    if ($isAjax) {
+        respondImport(false, 'Solicitud invalida para importacion.', 405);
+    }
+    header('Location: index.php');
     exit();
 }

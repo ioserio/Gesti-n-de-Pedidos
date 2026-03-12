@@ -71,24 +71,58 @@ function sanitize_decimal($value) {
     return $v; // dejar como string; MySQL lo convertirá a DECIMAL
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_cobranzas'])) {
-    $archivoTmp = $_FILES['archivo_cobranzas']['tmp_name'];
+$isAjax = (strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest')
+    || (stripos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false);
+
+function respondImport($ok, $message, $statusCode = 200, $extra = []) {
+    global $isAjax;
+    if ($isAjax) {
+        http_response_code((int)$statusCode);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(array_merge(['ok' => (bool)$ok, 'message' => (string)$message], $extra), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($ok) {
+        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Importacion de Cobranzas</title><link rel="stylesheet" href="estilos.css"></head><body><div class="container">';
+        echo '<h2>!Cobranzas importadas correctamente!</h2>';
+        echo '<p>' . htmlspecialchars((string)$message, ENT_QUOTES, 'UTF-8') . '</p>';
+        echo '<a href="index.php">Volver</a>';
+        echo '</div></body></html>';
+        exit;
+    }
+
+    http_response_code((int)$statusCode);
+    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Error</title><link rel="stylesheet" href="estilos.css"></head><body><div class="container">';
+    echo '<h2>Error al importar cobranzas</h2>';
+    echo '<pre style="white-space:pre-wrap;background:#f8f8f8;padding:12px;border:1px solid #ddd;border-radius:6px;">' . htmlspecialchars((string)$message, ENT_QUOTES, 'UTF-8') . '</pre>';
+    echo '<a href="index.php">Volver</a>';
+    echo '</div></body></html>';
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_FILES['archivo_cobranzas'])) {
+    if ($isAjax) {
+        respondImport(false, 'Solicitud invalida para importacion.', 405);
+    }
+    header('Location: index.php');
+    exit();
+}
+
+try {
+    $archivoTmp = $_FILES['archivo_cobranzas']['tmp_name'] ?? '';
 
     if (!is_uploaded_file($archivoTmp)) {
-        die('No se recibió un archivo válido.');
+        throw new Exception('No se recibio un archivo valido.');
     }
 
-    try {
-        $spreadsheet = IOFactory::load($archivoTmp);
-    } catch (Throwable $e) {
-        die('No se pudo leer el Excel: ' . htmlspecialchars($e->getMessage()));
-    }
+    $spreadsheet = IOFactory::load($archivoTmp);
 
     $sheet = $spreadsheet->getActiveSheet();
     // Obtener arreglo con datos formateados (fechas como se ven)
     $datos = $sheet->toArray(null, true, true, false);
     if (!$datos || count($datos) < 2) {
-        die('El archivo no contiene datos suficientes (se necesita al menos encabezado y una fila).');
+        throw new Exception('El archivo no contiene datos suficientes (se necesita al menos encabezado y una fila).');
     }
 
     // Encabezados y columnas normalizadas
@@ -103,16 +137,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_cobranzas'])
         $mysqli->query("TRUNCATE TABLE `$tabla`");
     }
 
-    // Preparación del INSERT dinámico
+    // Preparacion del INSERT dinamico
     $placeholders = implode(',', array_fill(0, count($colsNorm), '?'));
     $colList = '`' . implode('`,`', $colsNorm) . '`';
     $sql = "INSERT INTO `$tabla` ($colList) VALUES ($placeholders)";
     $stmt = $mysqli->prepare($sql);
     if (!$stmt) {
-        die('Error en la preparación de la consulta: ' . $mysqli->error);
+        throw new Exception('Error en la preparacion de la consulta: ' . $mysqli->error);
     }
 
-    // Identificar columnas por nombre para conversión específica
+    // Identificar columnas por nombre para conversion especifica
     $lowerCols = array_map('strval', $colsNorm);
     $isDateCol = array_map(function($c){ return strpos($c, 'fecha') !== false; }, $lowerCols);
 
@@ -130,12 +164,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_cobranzas'])
     for ($i = 1; $i < count($datos); $i++) {
         $fila = $datos[$i];
         if (!is_array($fila)) continue;
-        // pad a número de columnas
+        // pad a numero de columnas
         $fila = array_pad($fila, count($colsNorm), null);
 
         $vals = [];
         foreach ($fila as $idx => $val) {
-            $colNorm = $colsNorm[$idx];
             $v = $val;
 
             if ($isDateCol[$idx]) {
@@ -143,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_cobranzas'])
             } elseif ($isMoneyCol[$idx]) {
                 $v = sanitize_decimal($val);
             } else {
-                // recortar espacios
+                // Recortar espacios para columnas de texto.
                 if (is_string($v)) $v = trim($v);
             }
             $vals[] = $v;
@@ -154,8 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_cobranzas'])
         $stmt->bind_param($types, ...$vals);
         $ok = $stmt->execute();
         if (!$ok) {
-            // Puedes registrar el error y seguir, o abortar
-            die('Error al insertar fila ' . ($i+1) . ': ' . $stmt->error);
+            throw new Exception('Error al insertar fila ' . ($i + 1) . ': ' . $stmt->error);
         }
         $insertadas++;
     }
@@ -163,13 +195,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_cobranzas'])
     $stmt->close();
     $mysqli->close();
 
-    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Importación de Cobranzas</title><link rel="stylesheet" href="estilos.css"></head><body><div class="container">';
-    echo '<h2>¡Cobranzas importadas correctamente!</h2>';
-    echo '<p>Total filas insertadas: <b>' . intval($insertadas) . '</b></p>';
-    echo '<a href="index.html">Volver</a>';
-    echo '</div></body></html>';
-    exit;
+    respondImport(true, 'Total filas insertadas: ' . intval($insertadas), 200, ['rows' => intval($insertadas)]);
+} catch (Throwable $e) {
+    respondImport(false, 'Error al procesar cobranzas: ' . $e->getMessage(), 500);
 }
 
-header('Location: index.html');
+header('Location: index.php');
 exit();

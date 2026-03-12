@@ -4,6 +4,19 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+$isAjax = (strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest')
+    || (stripos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false);
+
+function respondImport($ok, $message, $statusCode = 200, $extra = []) {
+    global $isAjax;
+    if ($isAjax) {
+        http_response_code((int)$statusCode);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(array_merge(['ok' => (bool)$ok, 'message' => (string)$message], $extra), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_clientes'])) {
     @set_time_limit(300);
     @ini_set('max_execution_time', '300');
@@ -11,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_clientes']))
     $archivoTmp = $_FILES['archivo_clientes']['tmp_name'];
     $archivoSize = $_FILES['archivo_clientes']['size'] ?? 0;
     if (!is_uploaded_file($archivoTmp)) {
+        respondImport(false, 'No se recibio el archivo correctamente.', 400);
         http_response_code(400);
         echo 'No se recibió el archivo correctamente.';
         exit;
@@ -28,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_clientes']))
     // Leer CSV en streaming
     $fh = fopen($archivoTmp, 'r');
     if (!$fh) {
+        respondImport(false, 'No se pudo abrir el CSV.', 400);
         http_response_code(400);
         echo 'No se pudo abrir el CSV.';
         exit;
@@ -39,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_clientes']))
     $headers = fgetcsv($fh, 0, $delimiter);
     if ($headers === false || empty($headers)) {
         fclose($fh);
+        respondImport(false, 'El CSV no tiene cabeceras en la primera fila.', 400);
         http_response_code(400);
         echo 'El CSV no tiene cabeceras en la primera fila.';
         exit;
@@ -138,12 +154,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_clientes']))
     fclose($fh);
     $insertStmt->close(); $selByRuc->close(); $selByDoc->close(); $selByCod->close(); $updateByRuc->close(); $updateByDoc->close(); $updateByCod->close(); $mysqli->close();
 
+    respondImport(true, 'Importacion CSV completada. Insertados: ' . (int)$insertados . ', actualizados: ' . (int)$actualizados, 200, [
+        'insertados' => (int)$insertados,
+        'actualizados' => (int)$actualizados,
+    ]);
+
     echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Importación de Clientes (CSV)</title><link rel="stylesheet" href="estilos.css"></head><body><div class="container">';
     echo '<h2>Importación de cartera de clientes (CSV)</h2>';
     echo '<p><b>Insertados:</b> ' . (int)$insertados . ' &nbsp; <b>Actualizados:</b> ' . (int)$actualizados . '</p>';
     echo '<a href="index.php">Volver</a>';
     echo '</div></body></html>';
     exit;
+}
+
+if ($isAjax) {
+    respondImport(false, 'Solicitud invalida para importacion.', 405);
 }
 
 header('Location: index.php');

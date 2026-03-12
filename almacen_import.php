@@ -56,10 +56,31 @@ try {
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo 'Método no permitido';
+$isAjax = (strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest')
+    || (stripos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false);
+
+function respondImport($ok, $message, $statusCode = 200){
+    global $isAjax;
+    if ($isAjax) {
+        http_response_code((int)$statusCode);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['ok' => (bool)$ok, 'message' => (string)$message], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($ok) {
+        echo '<div class="msg-ok">' . h($message) . '</div>';
+        echo '<a href="index.php">Volver</a>';
+        exit;
+    }
+
+    http_response_code((int)$statusCode);
+    echo h($message);
     exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    respondImport(false, 'Metodo no permitido', 405);
 }
 
 $action = $_GET['action'] ?? ($_POST['action'] ?? 'moldes');
@@ -67,9 +88,7 @@ $action = $_GET['action'] ?? ($_POST['action'] ?? 'moldes');
 // Flujo independiente: importar sólo mapeo CODIGO->CAMIÓN
 if ($action === 'map') {
     if (!isset($_FILES['map_camion']) || !is_uploaded_file($_FILES['map_camion']['tmp_name'])) {
-        http_response_code(400);
-        echo 'Archivo de mapeo requerido (XLS/XLSX)';
-        exit;
+        respondImport(false, 'Archivo de mapeo requerido (XLS/XLSX)', 400);
     }
     try {
         $mapSS = IOFactory::load($_FILES['map_camion']['tmp_name']);
@@ -87,11 +106,9 @@ if ($action === 'map') {
             if ($stmtUp->execute()) { $count++; }
         }
         $stmtUp->close();
-        echo '<div class="msg-ok">Guardado mapeo de ' . h($count) . ' códigos.</div>';
-        echo '<a href="index.php">Volver</a>';
+        respondImport(true, 'Guardado mapeo de ' . $count . ' codigos.');
     } catch (Throwable $e) {
-        http_response_code(500);
-        echo 'Error procesando mapeo: ' . h($e->getMessage());
+        respondImport(false, 'Error procesando mapeo: ' . $e->getMessage(), 500);
     }
     exit;
 }
@@ -101,9 +118,7 @@ $fecha = isset($_POST['fecha']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['f
 $truncate = isset($_POST['truncate']) && ($_POST['truncate'] === '1' || $_POST['truncate'] === 'on');
 
 if (!isset($_FILES['xls']) || !is_uploaded_file($_FILES['xls']['tmp_name'])) {
-    http_response_code(400);
-    echo 'Archivo XLS/XLSX requerido';
-    exit;
+    respondImport(false, 'Archivo XLS/XLSX requerido', 400);
 }
 
 // Reset día si se pidió
@@ -156,9 +171,7 @@ try {
     }
     $stmt->close();
 
-    echo '<div class="msg-ok">Importados ' . h($inserted) . ' registros.</div>';
-    echo '<a href="index.php">Volver</a>';
+    respondImport(true, 'Importados ' . $inserted . ' registros.');
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo 'Error procesando XLSX: ' . h($e->getMessage());
+    respondImport(false, 'Error procesando XLSX: ' . $e->getMessage(), 500);
 }
