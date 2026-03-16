@@ -105,6 +105,7 @@ window.mostrarModulo = function(modulo) {
             'devoluciones':'devoluciones',
             'recojos':'recojos',
             'admin':'admin',
+            'cuota_mensual':'cuota_mensual',
             'cuotas_hist':'cuotas_hist', // nueva página histórica semanal
             'rutas':'rutas',
             'ctacte_vendedor':'ctacte_vendedor',
@@ -119,7 +120,7 @@ window.mostrarModulo = function(modulo) {
                 // Módulo bloqueado: mostrar Inicio y salir
                 const inicio = document.getElementById('modulo-inicio');
                 if (inicio) inicio.style.display = 'block';
-                const ids = ['modulo-subir','modulo-consultar','modulo-resumen','modulo-cobranzas','modulo-admin','modulo-rutas','modulo-usuarios','modulo-permisos','modulo-devoluciones','modulo-recojos','modulo-sesiones'];
+                const ids = ['modulo-subir','modulo-consultar','modulo-resumen','modulo-cobranzas','modulo-admin','modulo-cuota-mensual','modulo-rutas','modulo-usuarios','modulo-permisos','modulo-devoluciones','modulo-recojos','modulo-sesiones'];
                 ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display='none'; });
                 return;
             }
@@ -139,9 +140,14 @@ window.mostrarModulo = function(modulo) {
     if (wrap) {
         if (modulo === 'cobranzas' || modulo === 'devoluciones') wrap.classList.add('fullwidth');
         else wrap.classList.remove('fullwidth');
+
+        if (modulo === 'resumen') wrap.classList.add('resumenwide');
+        else wrap.classList.remove('resumenwide');
     }
     const admin = document.getElementById('modulo-admin');
     if (admin) admin.style.display = (modulo === 'admin') ? 'block' : 'none';
+    const cuotaMensual = document.getElementById('modulo-cuota-mensual');
+    if (cuotaMensual) cuotaMensual.style.display = (modulo === 'cuota_mensual') ? 'block' : 'none';
         const herramientas = document.getElementById('modulo-herramientas');
         if (herramientas) herramientas.style.display = (modulo === 'herramientas') ? 'block' : 'none';
         const rutas = document.getElementById('modulo-rutas');
@@ -172,6 +178,7 @@ window.mostrarModulo = function(modulo) {
             const fechaInput = document.getElementById('fecha_resumen');
             if (fechaInput) {
                 cargarResumen(fechaInput.value);
+                refreshResumenDashboard(fechaInput.value);
             }
             // Cargar la etiqueta de última actualización
             try { cargarUltimaActualizacion(); } catch(_) {}
@@ -192,6 +199,8 @@ window.mostrarModulo = function(modulo) {
             if (addBtn && !addBtn.__wired) { addBtn.__wired = true; addBtn.addEventListener('click', buildMassTemplateLegacy); }
             if (saveBtn && !saveBtn.__wired) { saveBtn.__wired = true; saveBtn.addEventListener('click', saveMassLegacy); }
         }, 50);
+        } else if (modulo === 'cuota_mensual') {
+            setTimeout(function(){ initCuotaMensualModule(); cargarCuotaMensual(); }, 50);
         } else if (modulo === 'devoluciones') {
             setTimeout(function(){
                 setFechaHoyDevoluciones();
@@ -465,6 +474,79 @@ function cargarResumen(fecha) {
     }
 }
 
+function cargarResumenHistorico(fecha) {
+    const cont = document.getElementById('resumen-historico');
+    const supervisor = document.getElementById('supervisor_resumen') ? document.getElementById('supervisor_resumen').value : '';
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando histórico...</p>';
+
+    let url = 'resumen_historico.php?fecha=' + encodeURIComponent(fecha || '');
+    if (supervisor) {
+        url += '&supervisor=' + encodeURIComponent(supervisor);
+    }
+
+    fetch(url)
+        .then(res => res.text())
+        .then(html => {
+            cont.innerHTML = html;
+        })
+        .catch(() => {
+            cont.innerHTML = '<p>Error al consultar histórico.</p>';
+        });
+}
+
+function canUseDashboardAdm() {
+    return !!(window.__PERMS && window.__PERMS.dashboard_adm === true);
+}
+
+function isDashboardAdmChecked() {
+    const chk = document.getElementById('resumen_adm_chk');
+    return !!(chk && chk.checked);
+}
+
+function syncResumenAdmControl() {
+    const wrap = document.getElementById('resumen-adm-wrap');
+    const chk = document.getElementById('resumen_adm_chk');
+    if (!wrap || !chk) return;
+
+    const allowed = canUseDashboardAdm();
+    wrap.style.display = 'inline-flex';
+    wrap.classList.toggle('is-disabled', !allowed);
+
+    if (allowed) {
+        chk.disabled = false;
+        chk.removeAttribute('title');
+        if (!chk.dataset.inited) {
+            chk.checked = true;
+            chk.dataset.inited = '1';
+        }
+    } else {
+        chk.disabled = true;
+        chk.title = 'Sin permiso para Dashboard ADM';
+        chk.checked = false;
+        delete chk.dataset.inited;
+    }
+}
+
+function refreshResumenDashboard(fecha) {
+    const layout = document.getElementById('resumen-layout');
+    const aside = document.getElementById('resumen-historico');
+    syncResumenAdmControl();
+
+    const dashboardOn = canUseDashboardAdm() && isDashboardAdmChecked();
+    if (layout) layout.classList.toggle('resumen-only', !dashboardOn);
+    if (!aside) return;
+
+    if (!dashboardOn) {
+        aside.style.display = 'none';
+        aside.innerHTML = '';
+        return;
+    }
+
+    aside.style.display = '';
+    cargarResumenHistorico(fecha);
+}
+
 // Cargar seguimiento por rangos horarios
 function cargarSeguimiento(fecha){
     const cont = document.getElementById('seguimiento');
@@ -499,6 +581,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const fecha = document.getElementById('fecha_resumen').value;
             cargarResumen(fecha);
+            refreshResumenDashboard(fecha);
             // Refrescar la última actualización por si hubo cambios recientes
             try { cargarUltimaActualizacion(); } catch(_) {}
         });
@@ -508,6 +591,7 @@ document.addEventListener('DOMContentLoaded', function() {
             supervisorSelect.addEventListener('change', function() {
                 const fecha = document.getElementById('fecha_resumen').value;
                 cargarResumen(fecha);
+                refreshResumenDashboard(fecha);
                 try { cargarUltimaActualizacion(); } catch(_) {}
             });
         }
@@ -516,9 +600,18 @@ document.addEventListener('DOMContentLoaded', function() {
             groupSupChk.addEventListener('change', function(){
                 const fecha = document.getElementById('fecha_resumen').value;
                 cargarResumen(fecha);
+                refreshResumenDashboard(fecha);
                 try { cargarUltimaActualizacion(); } catch(_) {}
             });
         }
+        const admChk = document.getElementById('resumen_adm_chk');
+        if (admChk) {
+            admChk.addEventListener('change', function(){
+                const fecha = document.getElementById('fecha_resumen').value;
+                refreshResumenDashboard(fecha);
+            });
+        }
+        syncResumenAdmControl();
     }
     // Evento para Seguimiento de Pedidos
     const formSeg = document.getElementById('form-seguimiento');
@@ -1388,6 +1481,12 @@ document.addEventListener('DOMContentLoaded', function(){
                         // Guardar globalmente para validar accesos cuando se invoca mostrarModulo
                         window.__PERMS = perms;
                         applyPermissionStyles(perms);
+                        syncResumenAdmControl();
+                        const secResumen = document.getElementById('modulo-resumen');
+                        const fechaResumen = document.getElementById('fecha_resumen');
+                        if (secResumen && secResumen.style.display !== 'none' && fechaResumen && fechaResumen.value) {
+                            refreshResumenDashboard(fechaResumen.value);
+                        }
                     })
                     .catch(()=>{});
             } catch(_){}
@@ -1408,16 +1507,8 @@ if (formResumen) {
     formResumen.addEventListener('submit', function(e) {
         e.preventDefault();
         const fecha = document.getElementById('fecha_resumen').value;
-        const resumen = document.getElementById('resumen');
-        resumen.innerHTML = '<p>Cargando...</p>';
-        fetch('resumen_pedidos.php?fecha=' + encodeURIComponent(fecha))
-            .then(res => res.text())
-            .then(html => {
-                resumen.innerHTML = html;
-            })
-            .catch(() => {
-                resumen.innerHTML = '<p>Error al consultar el resumen.</p>';
-            });
+        cargarResumen(fecha);
+        refreshResumenDashboard(fecha);
     });
 }
 // Vista previa del archivo seleccionado (opcional, solo nombre)
@@ -1539,6 +1630,155 @@ function saveMassLegacy(){
             cargarCuotas();
         })
         .catch(err => { massMsg.textContent = 'Error: ' + (err.message||''); });
+}
+
+function setCuotaMensualDefaults(){
+    const now = new Date();
+    const anio = now.getFullYear();
+    const mes = now.getMonth() + 1;
+    const cmAnio = document.getElementById('cm_anio');
+    const cmMes = document.getElementById('cm_mes');
+    const fAnio = document.getElementById('cmf_anio');
+    const fMes = document.getElementById('cmf_mes');
+    if (cmAnio && !cmAnio.value) cmAnio.value = String(anio);
+    if (cmMes && !cmMes.value) cmMes.value = String(mes);
+    if (fAnio && !fAnio.value) fAnio.value = String(anio);
+    if (fMes && !fMes.value) fMes.value = String(mes);
+}
+
+function limpiarFormCuotaMensual(){
+    const form = document.getElementById('form-cuota-mensual');
+    if (!form) return;
+    form.reset();
+    const id = document.getElementById('cm_id');
+    if (id) id.value = '';
+    const cancel = document.getElementById('cm_cancel');
+    if (cancel) cancel.style.display = 'none';
+    setCuotaMensualDefaults();
+}
+
+function cargarCuotaMensual(){
+    const cont = document.getElementById('cm_lista');
+    const anio = document.getElementById('cmf_anio') ? document.getElementById('cmf_anio').value.trim() : '';
+    const mes = document.getElementById('cmf_mes') ? document.getElementById('cmf_mes').value.trim() : '';
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando cuotas mensuales...</p>';
+
+    const params = new URLSearchParams();
+    params.append('action', 'list');
+    if (anio) params.append('anio', anio);
+    if (mes) params.append('mes', mes);
+
+    fetch('cuota_mensual_api.php?' + params.toString())
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(() => { cont.innerHTML = '<p>Error al cargar cuotas mensuales.</p>'; });
+}
+
+function initCuotaMensualModule(){
+    const form = document.getElementById('form-cuota-mensual');
+    const formFiltro = document.getElementById('form-cuota-mensual-filtro');
+    const lista = document.getElementById('cm_lista');
+    const msg = document.getElementById('cm_msg');
+    const cancel = document.getElementById('cm_cancel');
+
+    if (!form || !formFiltro || !lista || !msg || !cancel) return;
+    if (form.__wiredCuotaMensual) return;
+    form.__wiredCuotaMensual = true;
+
+    setCuotaMensualDefaults();
+
+    form.addEventListener('submit', function(e){
+        e.preventDefault();
+        const fd = new FormData(form);
+        fd.append('action', 'save');
+        msg.textContent = 'Guardando...';
+        fetch('cuota_mensual_api.php?action=save', { method:'POST', body: fd })
+            .then(r => r.json())
+            .then(j => {
+                if (!j || j.ok !== true) throw new Error(j && j.error ? j.error : 'Error');
+                msg.style.color = '#198754';
+                msg.textContent = 'Guardado correctamente.';
+                limpiarFormCuotaMensual();
+                cargarCuotaMensual();
+            })
+            .catch(err => {
+                msg.style.color = '#b91c1c';
+                msg.textContent = 'No se pudo guardar (' + (err.message || 'error') + ').';
+            });
+    });
+
+    formFiltro.addEventListener('submit', function(e){
+        e.preventDefault();
+        cargarCuotaMensual();
+    });
+
+    const clearBtn = document.getElementById('cmf_clear');
+    if (clearBtn && !clearBtn.__wired) {
+        clearBtn.__wired = true;
+        clearBtn.addEventListener('click', function(){
+            const fy = document.getElementById('cmf_anio');
+            const fm = document.getElementById('cmf_mes');
+            if (fy) fy.value = '';
+            if (fm) fm.value = '';
+            cargarCuotaMensual();
+        });
+    }
+
+    cancel.addEventListener('click', function(){
+        limpiarFormCuotaMensual();
+        msg.style.color = '#555';
+        msg.textContent = 'Edición cancelada.';
+    });
+
+    lista.addEventListener('click', function(e){
+        const btnEdit = e.target.closest('.cm-edit');
+        if (btnEdit) {
+            const id = btnEdit.getAttribute('data-id') || '';
+            if (!id) return;
+            fetch('cuota_mensual_api.php?action=get&id=' + encodeURIComponent(id))
+                .then(r => r.json())
+                .then(j => {
+                    if (!j || j.ok !== true || !j.row) throw new Error(j && j.error ? j.error : 'Error');
+                    const row = j.row;
+                    document.getElementById('cm_id').value = row.id || '';
+                    document.getElementById('cm_anio').value = row.Anio || '';
+                    document.getElementById('cm_mes').value = row.Mes || '';
+                    document.getElementById('cm_cuota').value = row.Cuota || '';
+                    cancel.style.display = 'inline-block';
+                    msg.style.color = '#555';
+                    msg.textContent = 'Modo edición activo.';
+                })
+                .catch(err => {
+                    msg.style.color = '#b91c1c';
+                    msg.textContent = 'No se pudo cargar el registro (' + (err.message || 'error') + ').';
+                });
+            return;
+        }
+
+        const btnDel = e.target.closest('.cm-del');
+        if (btnDel) {
+            const id = btnDel.getAttribute('data-id') || '';
+            if (!id) return;
+            if (!confirm('¿Eliminar esta cuota mensual?')) return;
+            const fd = new FormData();
+            fd.append('action', 'delete');
+            fd.append('id', id);
+            fetch('cuota_mensual_api.php?action=delete', { method:'POST', body: fd })
+                .then(r => r.json())
+                .then(j => {
+                    if (!j || j.ok !== true) throw new Error(j && j.error ? j.error : 'Error');
+                    msg.style.color = '#198754';
+                    msg.textContent = 'Registro eliminado.';
+                    limpiarFormCuotaMensual();
+                    cargarCuotaMensual();
+                })
+                .catch(err => {
+                    msg.style.color = '#b91c1c';
+                    msg.textContent = 'No se pudo eliminar (' + (err.message || 'error') + ').';
+                });
+        }
+    });
 }
 
 // Rutas: cargar listado

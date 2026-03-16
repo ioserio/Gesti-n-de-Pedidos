@@ -7,7 +7,7 @@
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
         <meta http-equiv="Pragma" content="no-cache" />
         <meta http-equiv="Expires" content="0" />
-        <link rel="stylesheet" href="estilos.css?v=mobile1">
+        <link rel="stylesheet" href="estilos.css?v=mobile4">
         <style>
             /* Fallback si el CSS queda en caché en móviles */
             body.is-mobile table.resumen-desktop { display: none !important; }
@@ -100,6 +100,7 @@
                     <ul class="submenu">
                         <li><a href="#" data-mod="admin" onclick="mostrarModulo('admin')">Administrador de Cuotas (Legacy)</a></li>
                         <li><a href="cuotas_gestion.php" data-mod="cuotas_hist">Cuotas Semanales / Histórico</a></li>
+                        <li><a href="#" data-mod="cuota_mensual" onclick="mostrarModulo('cuota_mensual')">Cuota/Mensual</a></li>
                         <li><a href="#" data-mod="rutas" onclick="mostrarModulo('rutas')">Rutas</a></li>
                         <li><a href="#" data-mod="ctacte_vendedor" onclick="mostrarModulo('ctacte_vendedor')">CTACTE/Vendedor</a></li>
                         <li><a href="#" data-mod="usuarios" onclick="mostrarModulo('usuarios')">Usuarios</a></li>
@@ -214,10 +215,19 @@
                 <input type="checkbox" id="group_sup_resumen">
                 Ver por mesa (Supervisor)
             </label>
+            <label id="resumen-adm-wrap" style="display:none; align-items:center; gap:6px;">
+                <input type="checkbox" id="resumen_adm_chk">
+                ADM
+            </label>
             <button type="submit">Consultar</button>
             <span id="ultima_actualizacion" style="margin-left:auto; color:#555; font-weight:600; white-space:nowrap;"></span>
         </form>
-        <div id="resumen"></div>
+        <div id="resumen-layout">
+            <div id="resumen-main">
+                <div id="resumen"></div>
+            </div>
+            <aside id="resumen-historico" aria-live="polite"></aside>
+        </div>
     </section>
     <section id="modulo-seguimiento" style="display:none;">
         <h2>Seguimiento de Pedidos</h2>
@@ -304,6 +314,64 @@
             <div id="mass-table-legacy"></div>
         </div>
         <div id="lista-cuotas"></div>
+    </section>
+    <section id="modulo-cuota-mensual" style="display:none;">
+        <h2>Cuota/Mensual</h2>
+        <p style="margin-bottom:10px;color:#555;">Registra la cuota global del mes (sin vendedor).</p>
+
+        <form id="form-cuota-mensual" style="margin-bottom:12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <input type="hidden" id="cm_id" name="id">
+            <label for="cm_anio">Año:</label>
+            <input type="number" id="cm_anio" name="anio" min="2000" max="2100" required style="width:90px;">
+
+            <label for="cm_mes">Mes:</label>
+            <select id="cm_mes" name="mes" required>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+
+            <label for="cm_cuota">Cuota S/</label>
+            <input type="number" id="cm_cuota" name="cuota" step="0.01" min="0" required style="width:120px;">
+
+            <button type="submit">Guardar</button>
+            <button type="button" id="cm_cancel" style="display:none; background:#6c757d;">Cancelar edición</button>
+        </form>
+
+        <form id="form-cuota-mensual-filtro" style="margin-bottom:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <label for="cmf_anio">Filtrar Año:</label>
+            <input type="number" id="cmf_anio" min="2000" max="2100" style="width:90px;">
+            <label for="cmf_mes">Mes:</label>
+            <select id="cmf_mes">
+                <option value="">Todos</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+            <button type="submit">Consultar</button>
+            <button type="button" id="cmf_clear" style="background:#6c757d;">Limpiar filtro</button>
+        </form>
+
+        <div id="cm_msg" style="font-size:12px; margin:8px 0; color:#555;"></div>
+        <div id="cm_lista"></div>
     </section>
     <section id="modulo-ctacte-vendedor" style="display:none;">
         <h2>CTACTE/Vendedor</h2>
@@ -453,6 +521,6 @@
         </div>
     </section>
     </div>
-    <script src="script.js?v=mobile3"></script>
+    <script src="script.js?v=mobile6"></script>
 </body>
 </html>

@@ -52,6 +52,7 @@ if (count($cuotas) === 0) {
     }
 }
 
+
 if ($result->num_rows > 0) {
     $total_pedidos = 0;
     $total_monto = 0;
