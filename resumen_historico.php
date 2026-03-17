@@ -181,61 +181,44 @@ if ($qm) {
 }
 
 $ventaMensualGlobal = 0.0;
-$qvm = $mysqli->prepare("SELECT SUM(CAST(REPLACE(Total_IGV, ',', '') AS DECIMAL(12,2))) AS total_igv FROM pedidos_x_dia WHERE Fecha BETWEEN ? AND ?");
+$montoNegativosMes = 0.0;
+
+// La tarjeta mensual ahora toma su venta desde cubo_de_ventas_resumen.
+// Regla: sumar columna total incluyendo negativos, ignorando anulado = 1.
+$fechaHoy = date('Y-m-d');
+$fechaLimite = $fecha;
+if ($fechaLimite < $mesIni) { $fechaLimite = $mesIni; }
+if ($fechaLimite > $mesFin) { $fechaLimite = $mesFin; }
+if ($fechaLimite > $fechaHoy) { $fechaLimite = $fechaHoy; }
+
+$qvm = $mysqli->prepare("SELECT
+    COALESCE(SUM(total), 0) AS venta_total,
+    COALESCE(SUM(CASE WHEN total < 0 THEN ABS(total) ELSE 0 END), 0) AS total_negativos
+    FROM cubo_de_ventas_resumen
+    WHERE fecha BETWEEN ? AND ?
+      AND COALESCE(anulado, 0) <> 1");
 if ($qvm) {
-    // Venta acumulada del mes hasta la fecha seleccionada, limitada al último día facturable del mes
-    $diaMes = (int)date('j', strtotime($fecha));
-    $diasMes = (int)date('t', strtotime($fecha));
-    $diasFacturablesMes = max(1, $diasMes - 1); // último día de pedidos factura al mes siguiente
-    $anioMes = date('Y-m', strtotime($fecha));
-    $ultimaFacturable = $anioMes . '-' . str_pad((string)$diasFacturablesMes, 2, '0', STR_PAD_LEFT);
-    // Incluir también el último día del mes anterior en el acumulado del mes actual
-    $inicioVentasMes = date('Y-m-d', strtotime($mesIni . ' -1 day'));
-
-    $fechaCorte = $fecha;
-    if ($fechaCorte < $mesIni) { $fechaCorte = $mesIni; }
-    if ($fechaCorte > $ultimaFacturable) { $fechaCorte = $ultimaFacturable; }
-
-    $qvm->bind_param('ss', $inicioVentasMes, $fechaCorte);
+    $qvm->bind_param('ss', $mesIni, $fechaLimite);
     $qvm->execute();
     $rvm = $qvm->get_result();
     if ($rvm && ($rowm = $rvm->fetch_assoc())) {
-        $ventaMensualGlobal = (float)$rowm['total_igv'];
+        $ventaMensualGlobal = (float)$rowm['venta_total'];
+        $montoNegativosMes = (float)$rowm['total_negativos'];
     }
     $qvm->close();
 }
 
 $faltanteMensualGlobal = max(0, $cuotaMensualGlobal - $ventaMensualGlobal);
-$diaMes = (int)date('j', strtotime($fecha));
-$diasMes = (int)date('t', strtotime($fecha));
-$diasFacturablesMes = max(1, $diasMes - 1);
-$anioMes = date('Y-m', strtotime($fecha));
-$ultimaFacturable = $anioMes . '-' . str_pad((string)$diasFacturablesMes, 2, '0', STR_PAD_LEFT);
 
-// Fecha límite para el cálculo de días transcurridos (no más allá del último día facturable)
-$fechaLimite = $fecha;
-if ($fechaLimite < $mesIni) { $fechaLimite = $mesIni; }
-if ($fechaLimite > $ultimaFacturable) { $fechaLimite = $ultimaFacturable; }
-
-// Días hábiles de venta transcurridos (lunes a sábado) en el mes actual
-// Nota de negocio: se suma también el último día hábil del mes anterior al mes actual.
+// Días hábiles de venta del mes: lunes a sábado, sin domingos.
 $diasHabilesTranscurridos = countBusinessDays($mesIni, $fechaLimite);
-$diasHabilesMes = countBusinessDays($mesIni, $ultimaFacturable);
-// Último día del mes anterior
-$ultimoDiaMesAnterior = date('Y-m-d', strtotime($mesIni . ' -1 day'));
-if (isBusinessDay($ultimoDiaMesAnterior)) {
-    // Siempre suma al total de días hábiles del mes
-    $diasHabilesMes++;
-    // Y ya debe considerarse como "transcurrido" cuando estamos dentro de este mes
-    // (es la venta que se factura el primer día del mes actual)
-    $diasHabilesTranscurridos++;
-}
+$diasHabilesMes = countBusinessDays($mesIni, $mesFin);
 
 $diasHabilesFaltantes = max(0, $diasHabilesMes - $diasHabilesTranscurridos);
 
 $proyeccionMensual = 0.0;
 if ($diasHabilesTranscurridos > 0 && $diasHabilesMes > 0) {
-    $proyeccionMensual = ($ventaMensualGlobal / $diasHabilesTranscurridos) * $diasHabilesMes;
+    $proyeccionMensual = (($ventaMensualGlobal / $diasHabilesTranscurridos) * $diasHabilesMes) - $montoNegativosMes;
 }
 $desvProyCuota = $proyeccionMensual - $cuotaMensualGlobal;
 $pctMensualRaw = $cuotaMensualGlobal > 0 ? (($ventaMensualGlobal / $cuotaMensualGlobal) * 100) : 0;
