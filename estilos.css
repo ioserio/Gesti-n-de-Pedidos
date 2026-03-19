@@ -516,15 +516,74 @@ button:hover {
 .seg-mobile .seg-head h3 { margin:0; font-size:16px; color:#333; }
 .seg-mobile .seg-card { border:1px solid #e5e7eb; border-radius:8px; padding:10px; margin:10px 0; background:#fafafa; }
 .seg-mobile .seg-vendor { font-weight:800; font-size:16px; color:#111827; margin-bottom:6px; }
+.seg-sort-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+.seg-sort-btn:hover {
+    background: transparent;
+    color: #0f4c81;
+}
+.seg-sort-btn.is-active {
+    color: #0f4c81;
+}
+.seg-sort-icon {
+    font-size: 12px;
+    line-height: 1;
+}
+.seg-progress-wrap { margin: 4px 0 10px 0; }
 .seg-mobile .seg-badges { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 8px 0; }
 .seg-mobile .seg-badge { background:#eef2ff; color:#111827; border-radius:999px; padding:4px 10px; font-weight:700; font-size:13px; min-width:64px; text-align:center; }
 .seg-mobile .seg-last { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; color:#374151; }
 .seg-mobile .seg-last .seg-time { font-weight:700; color:#111827; }
+.seg-progress {
+    position: relative;
+    width: 150px;
+    height: 22px;
+    margin: 0 auto;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #e5e7eb;
+    box-shadow: inset 0 0 0 1px #d1d5db;
+}
+.seg-progress-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    border-radius: 999px;
+}
+.seg-progress-fill.is-low { background: linear-gradient(90deg, #ef4444, #f97316); }
+.seg-progress-fill.is-mid { background: linear-gradient(90deg, #f59e0b, #facc15); }
+.seg-progress-fill.is-good { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.seg-progress-fill.is-top { background: linear-gradient(90deg, #0ea5e9, #2563eb); }
+.seg-progress-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    color: #111827;
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.55);
+}
 
 /* Forzar tarjetas en móviles */
 @media (max-width: 700px) {
     .seg-desktop { display:none; }
     .seg-mobile { display:block; }
+    .seg-progress { width: 100%; max-width: 260px; }
 }
 
 /* Paleta por rango para mejor escaneo */
@@ -692,6 +751,7 @@ th {
 #modulo-resumen .historico-progress {
     width: 100%;
     margin-right: 0;
+    margin-top: 6px;
 }
 #modulo-resumen .resumen-table-wrap table.resumen-desktop {
     margin-top: 0;
@@ -764,13 +824,26 @@ th {
     display: inline-flex;
     align-items: center;
 }
-#modulo-resumen .kpi-progress-wrap .progress {
-    margin-right: 0;
+#modulo-resumen .kpi-progress-wrap .seg-progress {
+    margin: 0;
 }
 #modulo-resumen .kpi-progress-wrap .progress-global {
     margin-left: 0;
     width: 205px;
     max-width: 33vw;
+}
+#modulo-resumen .avance-cell .seg-progress {
+    width: 132px;
+}
+#modulo-resumen .resumen-mobile .rm-progress-wrap,
+#modulo-resumen .resumen-mobile .rg-bar {
+    width: 100%;
+}
+#modulo-resumen .resumen-mobile .rm-progress,
+#modulo-resumen .resumen-mobile .rg-bar .seg-progress {
+    width: 100%;
+    max-width: none;
+    margin: 0;
 }
 
 /* =====================
@@ -783,15 +856,7 @@ th {
 .rm-label { font-weight: 600; color: #111827; font-size: clamp(14px, 3.7vw, 16px); letter-spacing: .2px; line-height: 1.2; }
 .rm-sub { font-weight: 500; color: #4b5563; font-size: 12px; margin-top: 3px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 /* Etiqueta dentro de la barra */
-.rm-track { height: 16px; background: #e5e7eb; border-radius: 999px; overflow: hidden; position: relative; }
-.rm-track .bar { height: 100%; display:block; position:relative; display:flex; align-items:center; }
-.rm-track .bar .pct-in { position:absolute; left:0; top:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; letter-spacing:.4px; color:#fff; mix-blend-mode:normal; }
-/* Ajustar contraste según color de fondo (simple fallback: texto oscuro si fondo muy claro amarillo) */
-.bar-yellow .pct-in { color:#222; }
-/* Para barras muy pequeñas (<15%) mover el texto fuera para legibilidad */
-.rm-track .bar[data-small="1"] .pct-in { position:static; padding-left:4px; justify-content:flex-start; color:#111827; }
-@media (max-width: 500px) { .rm-track { height:14px; } .rm-track .bar .pct-in { font-size:10px; } }
-@media (max-width: 500px) { .rm-track { height:14px; } }
+@media (max-width: 500px) { .resumen-mobile .seg-progress { height:20px; } .resumen-mobile .seg-progress-label { font-size:11px; } }
 
 /* Mostrar lista en pantallas pequeñas y ocultar la tabla de resumen */
 @media (max-width: 700px) {
@@ -824,12 +889,7 @@ th {
 .rm-global .rg-metrics { display:flex; flex-wrap:wrap; gap:8px 12px; font-size:13px; color:#1f2937; align-items:center; }
 .rm-global .rg-metrics strong { font-weight:800; color:#111827; }
 .rm-global .rg-bar { margin-top:8px; }
-.rm-global .rg-track { height:16px; background:#e5e7eb; border-radius:999px; overflow:hidden; position:relative; }
-.rm-global .rg-track .bar { height:100%; display:block; position:relative; display:flex; align-items:center; }
-.rm-global .rg-track .bar .pct-in { position:absolute; left:0; top:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; }
-.rm-global .bar-yellow .pct-in { color:#111; }
-.rm-global .rg-track .bar[data-small="1"] .pct-in { position:static; padding-left:4px; justify-content:flex-start; color:#111; }
-@media (max-width: 500px) { .rm-global .rg-track { height:14px; } .rm-global .rg-metrics { font-size:12px; } }
+@media (max-width: 500px) { .rm-global .rg-metrics { font-size:12px; } }
 
 /* Indicador de días de vencimiento */
 .vcto { display:inline-flex; align-items:center; gap:6px; }

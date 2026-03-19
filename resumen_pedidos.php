@@ -18,6 +18,27 @@ $vd_supervisor = [
     '115'=>'CARLOS','116'=>'CARLOS','119'=>'CARLOS','604'=>'FRANCISCO','605'=>'FRANCISCO'
 ];
 
+function resumenProgressClass(float $avance): string {
+    if ($avance < 40) return 'seg-progress-fill is-low';
+    if ($avance < 70) return 'seg-progress-fill is-mid';
+    if ($avance < 100) return 'seg-progress-fill is-good';
+    return 'seg-progress-fill is-top';
+}
+
+function renderResumenProgress(float $avance, string $extraClass = ''): string {
+    $avanceRedondeado = round($avance, 1);
+    $label = rtrim(rtrim(number_format($avanceRedondeado, 1, '.', ''), '0'), '.');
+    if ($label === '') $label = '0';
+    $label .= '%';
+    $width = max(0, min(100, $avanceRedondeado));
+    $class = trim('seg-progress ' . $extraClass);
+
+    return '<div class="' . $class . '" aria-label="Avance ' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '">' 
+        . '<div class="' . resumenProgressClass($avanceRedondeado) . '" style="width:' . number_format($width, 1, '.', '') . '%"></div>'
+        . '<span class="seg-progress-label">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</span>'
+        . '</div>';
+}
+
 $sql = "SELECT Cod_Vendedor, Nom_Vendedor, COUNT(*) AS ctd_pedidos, SUM(CAST(REPLACE(Total_IGV, ',', '') AS DECIMAL(12,2))) AS total_igv FROM pedidos_x_dia WHERE Fecha = ? GROUP BY Cod_Vendedor, Nom_Vendedor ORDER BY Cod_Vendedor ASC";
 $stmt = $mysqli->prepare($sql);
 $stmt->bind_param('s', $fecha);
@@ -125,11 +146,6 @@ if ($result->num_rows > 0) {
     echo '<tr><th colspan="' . ($groupSup ? '6' : '8') . '" class="resumen-top-cell">';
     $pctGlobalRaw = $total_cuota > 0 ? (($total_monto / $total_cuota) * 100) : 0;
     $pctGlobal = ($pctGlobalRaw < 100) ? floor($pctGlobalRaw) : round($pctGlobalRaw);
-    $pctGlobalCap = max(0, min(100, $pctGlobal));
-    $gBarClass = 'bar-red';
-    if ($pctGlobal >= 100) { $gBarClass = 'bar-green'; }
-    elseif ($pctGlobal >= 80) { $gBarClass = 'bar-yellow'; }
-    elseif ($pctGlobal >= 50) { $gBarClass = 'bar-orange'; }
     echo '<div class="resumen-top-row">';
     echo '<div class="resumen-kpis">';
     echo '<span class="kpi-chip kpi-pedidos">Pedidos: <b>' . $total_pedidos . '</b></span>';
@@ -139,7 +155,7 @@ if ($result->num_rows > 0) {
     echo '</div>';
     echo '<div class="resumen-avance-block">';
     echo '<span class="kpi-chip kpi-avance">Avance <b>' . $pctGlobal . '%</b></span>';
-    echo '<span class="kpi-progress-wrap"><span class="progress progress-global"><span class="bar ' . $gBarClass . '" style="width:' . $pctGlobalCap . '%"></span></span></span>';
+    echo '<span class="kpi-progress-wrap">' . renderResumenProgress((float)$pctGlobal, 'progress-global') . '</span>';
     echo '</div>';
     echo '</div>';
     echo '</th></tr>';
@@ -151,18 +167,13 @@ if ($result->num_rows > 0) {
             $faltanteVal = (float)$g['faltante'];
             $pctRaw = $cuotaVal > 0 ? (($ventaVal / $cuotaVal) * 100) : 0;
             $pct = ($pctRaw < 100) ? floor($pctRaw) : round($pctRaw);
-            $pctCap = max(0, min(100, $pct));
-            $barClass = 'bar-red';
-            if ($pct >= 100) { $barClass = 'bar-green'; }
-            elseif ($pct >= 80) { $barClass = 'bar-yellow'; }
-            elseif ($pct >= 50) { $barClass = 'bar-orange'; }
             echo '<tr>';
             echo '<td>' . htmlspecialchars($g['Supervisor']) . '</td>';
             echo '<td>' . htmlspecialchars($g['ctd_pedidos']) . '</td>';
             echo '<td>' . number_format($ventaVal, 2, '.', ',') . '</td>';
             echo '<td>' . number_format($cuotaVal, 2, '.', ',') . '</td>';
             echo '<td>' . number_format($faltanteVal, 2, '.', ',') . '</td>';
-            echo '<td class="avance-cell"><div class="progress"><div class="bar ' . $barClass . '" style="width:' . $pctCap . '%"></div></div><small>' . $pct . '%</small></td>';
+            echo '<td class="avance-cell">' . renderResumenProgress((float)$pct) . '</td>';
             echo '</tr>';
         }
         echo '</table></div>';
@@ -182,12 +193,7 @@ if ($result->num_rows > 0) {
             $ventaVal = (float)$row['total_igv'];
             $pctRaw = $cuotaVal > 0 ? (($ventaVal / $cuotaVal) * 100) : 0;
             $pct = ($pctRaw < 100) ? floor($pctRaw) : round($pctRaw);
-            $pctCap = max(0, min(100, $pct));
-            $barClass = 'bar-red';
-            if ($pct >= 100) { $barClass = 'bar-green'; }
-            elseif ($pct >= 80) { $barClass = 'bar-yellow'; }
-            elseif ($pct >= 50) { $barClass = 'bar-orange'; }
-            echo '<td class="avance-cell"><div class="progress"><div class="bar ' . $barClass . '" style="width:' . $pctCap . '%"></div></div><small>' . $pct . '%</small></td>';
+            echo '<td class="avance-cell">' . renderResumenProgress((float)$pct) . '</td>';
             echo '</tr>';
         }
         echo '</table></div>';
@@ -195,9 +201,6 @@ if ($result->num_rows > 0) {
     
         // Versión móvil tipo lista con resumen global
         echo '<div class="resumen-mobile">';
-        // Preparar barra global (reutilizamos variables ya calculadas arriba)
-        $globalBarWidth = ($pctGlobalCap > 0 && $pctGlobalCap < 6) ? 6 : $pctGlobalCap; // mínimo 6%
-        $globalDataSmall = ($globalBarWidth < 15) ? ' data-small="1"' : '';
         echo '<div class="rm-global">';
         echo   '<div class="rg-metrics">'
                         . '<span><strong>Pedidos:</strong> ' . $total_pedidos . '</span>'
@@ -206,7 +209,7 @@ if ($result->num_rows > 0) {
                         . '<span><strong>Faltante:</strong> S/ ' . number_format($total_faltante_view, 2, '.', ',') . '</span>'
                         . '<span><strong>Avance:</strong> ' . $pctGlobal . '%</span>'
                     . '</div>';
-        echo   '<div class="rg-bar"><div class="rg-track"><span class="bar ' . $gBarClass . '" style="width:' . $globalBarWidth . '%"' . $globalDataSmall . '><span class="pct-in">' . $pctGlobal . '%</span></span></div></div>';
+        echo   '<div class="rg-bar">' . renderResumenProgress((float)$pctGlobal, 'rm-progress') . '</div>';
         echo '</div>';
         echo '<h3 class="rm-title">Resumen de Avance' . ($supervisor ? ' — ' . htmlspecialchars($supervisor) : '') . '</h3>';
     echo '<div class="rm-list">';
@@ -226,20 +229,13 @@ if ($result->num_rows > 0) {
             $cuotaVal = (float)$g['cuota'];
             $pctRaw = $cuotaVal > 0 ? (($ventaVal / $cuotaVal) * 100) : 0;
             $pct = ($pctRaw < 100) ? floor($pctRaw) : round($pctRaw);
-            $pctCap = max(0, min(100, $pct));
-            $barClass = 'bar-red';
-            if ($pct >= 100) { $barClass = 'bar-green'; }
-            elseif ($pct >= 80) { $barClass = 'bar-yellow'; }
-            elseif ($pct >= 50) { $barClass = 'bar-orange'; }
-            $barWidth = ($pctCap > 0 && $pctCap < 6) ? 6 : $pctCap;
             $label = htmlspecialchars($supName);
             $montoFmt = 'S/ ' . number_format($ventaVal, 2, '.', ',');
             $cuotaFmt = $cuotaVal > 0 ? ('S/ ' . number_format($cuotaVal, 2, '.', ',')) : '—';
             $faltFmt = 'S/ ' . number_format(max(0, $cuotaVal - $ventaVal), 2, '.', ',');
-            $pctTxt = $pct . '%';
             echo '<div class="rm-item">';
             echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . ' / Faltante: ' . $faltFmt . '</div></div>';
-            echo   '<div class="rm-track"><span class="bar ' . $barClass . '" style="width:' . $barWidth . '%"><span class="pct-in">' . $pctTxt . '</span></span></div>';
+            echo   '<div class="rm-progress-wrap">' . renderResumenProgress((float)$pct, 'rm-progress') . '</div>';
             echo '</div>';
         }
     } else {
@@ -253,23 +249,13 @@ if ($result->num_rows > 0) {
         $cuotaVal = isset($row['CuotaVal']) ? (float)$row['CuotaVal'] : 0.0;
         $pctRaw = $cuotaVal > 0 ? (($ventaVal / $cuotaVal) * 100) : 0;
         $pct = ($pctRaw < 100) ? floor($pctRaw) : round($pctRaw);
-        $pctCap = max(0, min(100, $pct));
-        $barClass = 'bar-red';
-        if ($pct >= 100) { $barClass = 'bar-green'; }
-        elseif ($pct >= 80) { $barClass = 'bar-yellow'; }
-        elseif ($pct >= 50) { $barClass = 'bar-orange'; }
-
-        // Para barras de porcentaje muy pequeñas asegurar visibilidad mínima si pct>0
-        $barWidth = ($pctCap > 0 && $pctCap < 6) ? 6 : $pctCap; // mínimo 6%
-
         $label = htmlspecialchars($vdPadded3 . ' - ' . $row['Nom_Vendedor']);
         $montoFmt = 'S/ ' . number_format($ventaVal, 2, '.', ',');
         $cuotaFmt = $cuotaVal > 0 ? ('S/ ' . number_format($cuotaVal, 2, '.', ',')) : '—';
         $faltFmt = 'S/ ' . number_format(max(0, $cuotaVal - $ventaVal), 2, '.', ',');
-        $pctTxt = $pct . '%';
     echo '<div class="rm-item">';
     echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . ' / Faltante: ' . $faltFmt . '</div></div>';
-    echo   '<div class="rm-track"><span class="bar ' . $barClass . '" style="width:' . $barWidth . '%"><span class="pct-in">' . $pctTxt . '</span></span></div>';
+    echo   '<div class="rm-progress-wrap">' . renderResumenProgress((float)$pct, 'rm-progress') . '</div>';
     echo '</div>';
     }
     }

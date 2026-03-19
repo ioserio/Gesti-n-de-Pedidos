@@ -64,6 +64,9 @@ function setFechaHoySeguimiento(){
     }
 }
 
+window.__seguimientoSortPrev = window.__seguimientoSortPrev || '';
+window.__seguimientoSortLast = window.__seguimientoSortLast || '';
+
     // Función para poner la fecha de hoy en el input de devoluciones
     function setFechaHoyDevoluciones() {
         const fechaInput = document.getElementById('fecha_dev');
@@ -548,16 +551,47 @@ function refreshResumenDashboard(fecha) {
 }
 
 // Cargar seguimiento por rangos horarios
-function cargarSeguimiento(fecha){
+function cargarSeguimiento(fecha, sortState){
     const cont = document.getElementById('seguimiento');
     if (!cont) return;
     cont.innerHTML = '<p>Cargando...</p>';
     const supervisor = document.getElementById('supervisor_seguimiento') ? document.getElementById('supervisor_seguimiento').value : '';
+    const state = (sortState && typeof sortState === 'object') ? sortState : {};
+    const sortPrev = (typeof state.sortPrev === 'string') ? state.sortPrev : (window.__seguimientoSortPrev || '');
+    const sortLast = (typeof state.sortLast === 'string') ? state.sortLast : (window.__seguimientoSortLast || '');
+    window.__seguimientoSortPrev = sortPrev;
+    window.__seguimientoSortLast = sortLast;
     let url = 'seguimiento_pedidos.php?fecha=' + encodeURIComponent(fecha || '');
     if (supervisor) url += '&supervisor=' + encodeURIComponent(supervisor);
+    if (sortPrev) url += '&sort_prev=' + encodeURIComponent(sortPrev);
+    if (sortLast) url += '&sort_last=' + encodeURIComponent(sortLast);
     fetch(url)
         .then(r => r.text())
-        .then(html => { cont.innerHTML = html; })
+        .then(html => {
+            cont.innerHTML = html;
+            const sortPrevBtn = cont.querySelector('[data-sort-prev]');
+            const sortBtn = cont.querySelector('[data-sort-last]');
+            if (sortPrevBtn) {
+                sortPrevBtn.addEventListener('click', function(){
+                    const fechaActual = document.getElementById('fecha_seguimiento') ? document.getElementById('fecha_seguimiento').value : '';
+                    const nextSortPrev = this.getAttribute('data-sort-prev') || 'asc';
+                    cargarSeguimiento(fechaActual, {
+                        sortPrev: nextSortPrev,
+                        sortLast: ''
+                    });
+                });
+            }
+            if (sortBtn) {
+                sortBtn.addEventListener('click', function(){
+                    const fechaActual = document.getElementById('fecha_seguimiento') ? document.getElementById('fecha_seguimiento').value : '';
+                    const nextSort = this.getAttribute('data-sort-last') || 'asc';
+                    cargarSeguimiento(fechaActual, {
+                        sortPrev: '',
+                        sortLast: nextSort
+                    });
+                });
+            }
+        })
         .catch(() => { cont.innerHTML = '<p>Error al consultar seguimiento.</p>'; });
 }
 

@@ -127,6 +127,27 @@ function totalizarFecha(mysqli $mysqli, string $fecha, string $supervisor, array
     ];
 }
 
+function resumenHistoricoProgressClass(float $avance): string {
+    if ($avance < 40) return 'seg-progress-fill is-low';
+    if ($avance < 70) return 'seg-progress-fill is-mid';
+    if ($avance < 100) return 'seg-progress-fill is-good';
+    return 'seg-progress-fill is-top';
+}
+
+function renderResumenHistoricoProgress(float $avance, string $extraClass = ''): string {
+    $avanceRedondeado = round($avance, 1);
+    $label = rtrim(rtrim(number_format($avanceRedondeado, 1, '.', ''), '0'), '.');
+    if ($label === '') $label = '0';
+    $label .= '%';
+    $width = max(0, min(100, $avanceRedondeado));
+    $class = trim('seg-progress ' . $extraClass);
+
+    return '<div class="' . $class . '" aria-label="Avance ' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '">' 
+        . '<div class="' . resumenHistoricoProgressClass($avanceRedondeado) . '" style="width:' . number_format($width, 1, '.', '') . '%"></div>'
+        . '<span class="seg-progress-label">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</span>'
+        . '</div>';
+}
+
 /**
  * Cuenta días hábiles de facturación (lunes a sábado) entre dos fechas inclusive.
  */
@@ -223,11 +244,6 @@ if ($diasHabilesTranscurridos > 0 && $diasHabilesMes > 0) {
 $desvProyCuota = $proyeccionMensual - $cuotaMensualGlobal;
 $pctMensualRaw = $cuotaMensualGlobal > 0 ? (($ventaMensualGlobal / $cuotaMensualGlobal) * 100) : 0;
 $pctMensual = ($pctMensualRaw < 100) ? floor($pctMensualRaw) : round($pctMensualRaw);
-$pctMensualCap = max(0, min(100, $pctMensual));
-$mBarClass = 'bar-red';
-if ($pctMensual >= 100) { $mBarClass = 'bar-green'; }
-elseif ($pctMensual >= 80) { $mBarClass = 'bar-yellow'; }
-elseif ($pctMensual >= 50) { $mBarClass = 'bar-orange'; }
 
 echo '<div class="cuota-mes-side">';
 echo '<h3>Cuota del Mes</h3>';
@@ -244,7 +260,7 @@ echo '<div class="hm"><small>Desv. Proy vs Cuota</small><b>'
     . number_format(abs($desvProyCuota), 2, '.', ',')
     . '</b></div>';
 echo '</div>';
-echo '<div class="progress historico-progress"><div class="bar ' . $mBarClass . '" style="width:' . $pctMensualCap . '%"></div></div>';
+echo renderResumenHistoricoProgress((float)$pctMensual, 'historico-progress');
 echo '</div>';
 
 echo '<div class="historico-side">';
@@ -255,12 +271,6 @@ echo '<div class="historico-list">';
 foreach ($fechas as $f) {
     $tot = totalizarFecha($mysqli, $f, $supervisor, $vd_supervisor);
     $pct = (int)$tot['avance'];
-    $pctCap = max(0, min(100, $pct));
-
-    $barClass = 'bar-red';
-    if ($pct >= 100) { $barClass = 'bar-green'; }
-    elseif ($pct >= 80) { $barClass = 'bar-yellow'; }
-    elseif ($pct >= 50) { $barClass = 'bar-orange'; }
 
     echo '<div class="historico-item">';
     echo '<div class="historico-head">';
@@ -273,7 +283,7 @@ foreach ($fechas as $f) {
     echo '<div class="hm"><small>Faltante</small><b>S/ ' . number_format((float)$tot['faltante'], 2, '.', ',') . '</b></div>';
     echo '<div class="hm"><small>Pedidos</small><b>' . (int)$tot['pedidos'] . '</b></div>';
     echo '</div>';
-    echo '<div class="progress historico-progress"><div class="bar ' . $barClass . '" style="width:' . $pctCap . '%"></div></div>';
+    echo renderResumenHistoricoProgress((float)$pct, 'historico-progress');
     echo '</div>';
 }
 

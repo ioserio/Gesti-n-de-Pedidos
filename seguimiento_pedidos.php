@@ -5,6 +5,10 @@ require_once __DIR__ . '/conexion.php';
 // Fecha objetivo (YYYY-MM-DD); por defecto hoy
 $fecha = isset($_GET['fecha']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['fecha']) ? $_GET['fecha'] : date('Y-m-d');
 $supervisor = isset($_GET['supervisor']) ? strtoupper(trim($_GET['supervisor'])) : '';
+$sortPrev = isset($_GET['sort_prev']) ? strtolower(trim((string)$_GET['sort_prev'])) : '';
+$sortLast = isset($_GET['sort_last']) ? strtolower(trim((string)$_GET['sort_last'])) : '';
+if ($sortPrev !== 'asc' && $sortPrev !== 'desc') $sortPrev = '';
+if ($sortLast !== 'asc' && $sortLast !== 'desc') $sortLast = '';
 
 // Definición de rangos (exactamente como imagen):
 $rangos = [
@@ -41,6 +45,75 @@ function supervisorDe($cod,$map){
     return '';
 }
 
+function cuotasPorFecha(mysqli $mysqli, string $fecha): array {
+    $dow = intval(date('N', strtotime($fecha)));
+    $cuotas = [];
+
+    $qh = $mysqli->prepare("SELECT Cod_Vendedor, Cuota, vigente_desde FROM cuotas_vendedor_hist WHERE Dia_Semana=? AND vigente_desde<=? ORDER BY Cod_Vendedor ASC, vigente_desde DESC");
+    if ($qh) {
+        $qh->bind_param('is', $dow, $fecha);
+        $qh->execute();
+        $rh = $qh->get_result();
+        $seen = [];
+        while ($rh && ($rowq = $rh->fetch_assoc())) {
+            $vd = (string)$rowq['Cod_Vendedor'];
+            if (!isset($seen[$vd])) {
+                $cuotas[$vd] = (float)$rowq['Cuota'];
+                $seen[$vd] = true;
+            }
+        }
+        $qh->close();
+    }
+
+    if (!$cuotas) {
+        $q = $mysqli->prepare("SELECT Cod_Vendedor, Cuota FROM cuotas_vendedor WHERE Dia_Semana=?");
+        if ($q) {
+            $q->bind_param('i', $dow);
+            $q->execute();
+            $r = $q->get_result();
+            while ($r && ($rowq = $r->fetch_assoc())) {
+                $cuotas[(string)$rowq['Cod_Vendedor']] = (float)$rowq['Cuota'];
+            }
+            $q->close();
+        }
+    }
+
+    return $cuotas;
+}
+
+function cuotaDeVendedor(string $cod, array $cuotas): float {
+    $raw = trim($cod);
+    $noz = ltrim($raw, '0');
+    if ($noz === '') $noz = '0';
+    $pad = str_pad($noz, 3, '0', STR_PAD_LEFT);
+
+    if (isset($cuotas[$raw])) return (float)$cuotas[$raw];
+    if (isset($cuotas[$noz])) return (float)$cuotas[$noz];
+    if (isset($cuotas[$pad])) return (float)$cuotas[$pad];
+    return 0.0;
+}
+
+function claseAvanceSeguimiento(float $avance): string {
+    if ($avance < 40) return 'seg-progress-fill is-low';
+    if ($avance < 70) return 'seg-progress-fill is-mid';
+    if ($avance < 100) return 'seg-progress-fill is-good';
+    return 'seg-progress-fill is-top';
+}
+
+function renderAvanceSeguimiento(float $avance): string {
+    $avanceRedondeado = round($avance, 1);
+    $label = rtrim(rtrim(number_format($avanceRedondeado, 1, '.', ''), '0'), '.');
+    if ($label === '') $label = '0';
+    $label .= '%';
+    $width = max(0, min(100, $avanceRedondeado));
+    $class = claseAvanceSeguimiento($avanceRedondeado);
+
+    return '<div class="seg-progress" aria-label="Avance de cuota ' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '">' 
+        . '<div class="' . $class . '" style="width:' . number_format($width, 1, '.', '') . '%"></div>'
+        . '<span class="seg-progress-label">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</span>'
+        . '</div>';
+}
+
 // Obtener lista completa de vendedores (codigo) para mostrar todos aunque tengan 0 pedidos
 $vendedores = [];
 $resVend = $mysqli->query("SELECT TRIM(codigo) AS cod FROM vendedores WHERE TRIM(codigo) REGEXP '^[0-9]{1,3}$' OR LENGTH(TRIM(codigo))<=3");
@@ -66,9 +139,12 @@ if (!count($vendedores)) {
 // Asegurar orden por código numérico (manteniendo formato string 3 dígitos)
 uksort($vendedores, function($a,$b){ return intval($a) <=> intval($b); });
 
+$cuotas = cuotasPorFecha($mysqli, $fecha);
+
 // Traer todos los pedidos del día con Hora y vendedor
 $pedidos = [];
-$stmtP = $mysqli->prepare("SELECT Cod_Vendedor, Hora FROM pedidos_x_dia WHERE Fecha=? AND Hora IS NOT NULL ORDER BY Hora ASC");
+$ventas = [];
+$stmtP = $mysqli->prepare("SELECT Cod_Vendedor, Hora, Total_IGV FROM pedidos_x_dia WHERE Fecha=? AND Hora IS NOT NULL ORDER BY Hora ASC");
 if ($stmtP){
     $stmtP->bind_param('s',$fecha);
     $stmtP->execute();
@@ -78,6 +154,8 @@ if ($stmtP){
         $vdNum = ctype_digit($vdRaw) ? str_pad(ltrim($vdRaw,'0'),3,'0',STR_PAD_LEFT) : $vdRaw;
         if (!isset($pedidos[$vdNum])) $pedidos[$vdNum] = [];
         $pedidos[$vdNum][] = $row['Hora']; // formato HH:MM:SS
+        if (!isset($ventas[$vdNum])) $ventas[$vdNum] = 0.0;
+        $ventas[$vdNum] += (float)str_replace(',', '', (string)$row['Total_IGV']);
     }
     $stmtP->close();
 }
@@ -99,6 +177,9 @@ foreach ($vendedores as $cod => $info) {
     }
     // Últimas dos horas generales (desc)
     $last1 = null; $last2 = null;
+    $cuota = cuotaDeVendedor($cod, $cuotas);
+    $venta = isset($ventas[$cod]) ? (float)$ventas[$cod] : 0.0;
+    $avance = $cuota > 0 ? (($venta / $cuota) * 100) : 0.0;
     if (count($times)) {
         rsort($times); // Orden descendente lexicográfico funciona para HH:MM:SS
         $last1 = substr($times[0],0,5);
@@ -106,6 +187,7 @@ foreach ($vendedores as $cod => $info) {
     }
     $filas[] = [
         'cod' => $cod,
+        'avance' => $avance,
         'r1' => $counts[1],
         'r2' => $counts[2],
         'r3' => $counts[3],
@@ -115,22 +197,62 @@ foreach ($vendedores as $cod => $info) {
     ];
 }
 
+if ($sortPrev !== '' || $sortLast !== '') {
+    usort($filas, function($a, $b) use ($sortPrev, $sortLast) {
+        $compareHora = function($left, $right, $direction) {
+            if ($direction === '') return 0;
+            $leftNull = empty($left);
+            $rightNull = empty($right);
+            if ($leftNull && $rightNull) return 0;
+            if ($leftNull) return 1;
+            if ($rightNull) return -1;
+
+            $cmp = strcmp((string)$left, (string)$right);
+            if ($cmp === 0) return 0;
+            return ($direction === 'asc') ? $cmp : -$cmp;
+        };
+
+        $cmpPrev = $compareHora($a['l2'], $b['l2'], $sortPrev);
+        if ($cmpPrev !== 0) return $cmpPrev;
+
+        $cmpLast = $compareHora($a['l1'], $b['l1'], $sortLast);
+        if ($cmpLast !== 0) return $cmpLast;
+
+        $aNull = empty($a['l1']) && empty($a['l2']);
+        $bNull = empty($b['l1']) && empty($b['l2']);
+        if ($aNull && $bNull) return intval($a['cod']) <=> intval($b['cod']);
+        if ($aNull) return 1;
+        if ($bNull) return -1;
+
+        return intval($a['cod']) <=> intval($b['cod']);
+    });
+}
+
+$nextSortPrev = ($sortPrev === 'asc') ? 'desc' : 'asc';
+$sortPrevArrow = ($sortPrev === 'asc') ? '▲' : (($sortPrev === 'desc') ? '▼' : '⇅');
+$sortPrevTitle = ($sortPrev === 'asc') ? 'Ordenado de menor a mayor' : (($sortPrev === 'desc') ? 'Ordenado de mayor a menor' : 'Ordenar por penúltimo pedido');
+$nextSortLast = ($sortLast === 'asc') ? 'desc' : 'asc';
+$sortArrow = ($sortLast === 'asc') ? '▲' : (($sortLast === 'desc') ? '▼' : '⇅');
+$sortTitle = ($sortLast === 'asc') ? 'Ordenado de menor a mayor' : (($sortLast === 'desc') ? 'Ordenado de mayor a menor' : 'Ordenar por último pedido');
+
 // Render de la tabla de seguimiento (desktop)
 echo '<table class="seg-desktop">';
-echo '<tr><th colspan="7" style="text-align:left; background:#e6f2ff; font-size:17px;">Seguimiento del ' . htmlspecialchars($fecha) . ($supervisor ? ' — Supervisor: ' . htmlspecialchars($supervisor) : '') . ' <button onclick="window.print()" style="float:right; background:#007bff; color:#fff; border:none; padding:6px 16px; border-radius:4px; cursor:pointer; font-size:15px;">Imprimir PDF</button></th></tr>';
+echo '<tr><th colspan="8" style="text-align:left; background:#e6f2ff; font-size:17px;">Seguimiento del ' . htmlspecialchars($fecha) . ($supervisor ? ' — Supervisor: ' . htmlspecialchars($supervisor) : '') . ' <button onclick="window.print()" style="float:right; background:#007bff; color:#fff; border:none; padding:6px 16px; border-radius:4px; cursor:pointer; font-size:15px;">Imprimir PDF</button></th></tr>';
 echo '<tr>';
 echo '<th style="text-align:center;">Vendedor</th>';
+echo '<th style="text-align:center; min-width:170px;">Avance cuota</th>';
 echo '<th style="text-align:center;">RANGO 1<br><small>7 - 9</small></th>';
 echo '<th style="text-align:center;">RANGO 2<br><small>10 - 12</small></th>';
 echo '<th style="text-align:center;">RANGO 3<br><small>13 - 15</small></th>';
 echo '<th style="text-align:center;">RANGO 4<br><small>16 - 18</small></th>';
-echo '<th style="text-align:center;">Penultimo pedido</th>';
-echo '<th style="text-align:center;">Ultimo pedido</th>';
+echo '<th style="text-align:center;"><button type="button" class="seg-sort-btn' . ($sortPrev !== '' ? ' is-active' : '') . '" data-sort-prev="' . htmlspecialchars($nextSortPrev, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortPrevTitle, ENT_QUOTES, 'UTF-8') . '">Penultimo pedido <span class="seg-sort-icon">' . htmlspecialchars($sortPrevArrow, ENT_QUOTES, 'UTF-8') . '</span></button></th>';
+echo '<th style="text-align:center;"><button type="button" class="seg-sort-btn' . ($sortLast !== '' ? ' is-active' : '') . '" data-sort-last="' . htmlspecialchars($nextSortLast, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortTitle, ENT_QUOTES, 'UTF-8') . '">Ultimo pedido <span class="seg-sort-icon">' . htmlspecialchars($sortArrow, ENT_QUOTES, 'UTF-8') . '</span></button></th>';
 echo '</tr>';
 foreach ($filas as $f) {
     echo '<tr>';
     // Mostrar penúltimo (l2) y último (l1) según petición
     echo '<td style="text-align:center;">' . htmlspecialchars($f['cod']) . '</td>';
+    echo '<td style="text-align:center;">' . renderAvanceSeguimiento((float)$f['avance']) . '</td>';
     echo '<td style="text-align:center;">' . intval($f['r1']) . '</td>';
     echo '<td style="text-align:center;">' . intval($f['r2']) . '</td>';
     echo '<td style="text-align:center;">' . intval($f['r3']) . '</td>';
@@ -150,6 +272,7 @@ echo '<div class="seg-head">'
 foreach ($filas as $f) {
     echo '<div class="seg-card">';
     echo   '<div class="seg-vendor">Vendedor ' . htmlspecialchars($f['cod']) . '</div>';
+    echo   '<div class="seg-progress-wrap">' . renderAvanceSeguimiento((float)$f['avance']) . '</div>';
     echo   '<div class="seg-badges">'
             . '<span class="seg-badge r1">R1 (' . htmlspecialchars($rLabels[1]) . '): ' . intval($f['r1']) . '</span>'
             . '<span class="seg-badge r2">R2 (' . htmlspecialchars($rLabels[2]) . '): ' . intval($f['r2']) . '</span>'
