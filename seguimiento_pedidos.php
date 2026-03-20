@@ -228,10 +228,10 @@ if ($sortPrev !== '' || $sortLast !== '') {
     });
 }
 
-$nextSortPrev = ($sortPrev === 'asc') ? 'desc' : 'asc';
+$nextSortPrev = ($sortPrev === 'asc') ? 'desc' : (($sortPrev === 'desc') ? '' : 'asc');
 $sortPrevArrow = ($sortPrev === 'asc') ? '▲' : (($sortPrev === 'desc') ? '▼' : '⇅');
 $sortPrevTitle = ($sortPrev === 'asc') ? 'Ordenado de menor a mayor' : (($sortPrev === 'desc') ? 'Ordenado de mayor a menor' : 'Ordenar por penúltimo pedido');
-$nextSortLast = ($sortLast === 'asc') ? 'desc' : 'asc';
+$nextSortLast = ($sortLast === 'asc') ? 'desc' : (($sortLast === 'desc') ? '' : 'asc');
 $sortArrow = ($sortLast === 'asc') ? '▲' : (($sortLast === 'desc') ? '▼' : '⇅');
 $sortTitle = ($sortLast === 'asc') ? 'Ordenado de menor a mayor' : (($sortLast === 'desc') ? 'Ordenado de mayor a menor' : 'Ordenar por último pedido');
 

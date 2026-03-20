@@ -30,10 +30,45 @@
     }
 })();
 
+window.__themeStorageKey = 'rikflex-theme';
+
+function applyTheme(mode) {
+    const isDark = mode !== 'light';
+    document.body.classList.toggle('dark-theme', isDark);
+    const btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+    btn.setAttribute('title', isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro');
+    btn.setAttribute('aria-label', isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro');
+    const icon = btn.querySelector('.theme-toggle-icon');
+    if (icon) icon.textContent = isDark ? '☾' : '☀';
+}
+
+function initThemeToggle() {
+    let storedMode = 'dark';
+    try {
+        const saved = localStorage.getItem(window.__themeStorageKey);
+        if (saved === 'light' || saved === 'dark') storedMode = saved;
+    } catch (_) {}
+
+    applyTheme(storedMode);
+
+    const btn = document.getElementById('theme-toggle');
+    if (!btn || btn.__themeWired) return;
+    btn.__themeWired = true;
+    btn.addEventListener('click', function() {
+        const nextMode = document.body.classList.contains('dark-theme') ? 'light' : 'dark';
+        applyTheme(nextMode);
+        try {
+            localStorage.setItem(window.__themeStorageKey, nextMode);
+        } catch (_) {}
+    });
+}
+
 // Función para poner la fecha de hoy en el input de resumen
 function setFechaHoyResumen() {
     const fechaInput = document.getElementById('fecha_resumen');
-    if (fechaInput) {
+    if (fechaInput && !fechaInput.value) {
         const hoy = new Date();
         const yyyy = hoy.getFullYear();
         const mm = String(hoy.getMonth() + 1).padStart(2, '0');
@@ -55,7 +90,7 @@ function mondayOfCurrentWeek(){
 // Fecha de hoy para seguimiento de pedidos
 function setFechaHoySeguimiento(){
     const el = document.getElementById('fecha_seguimiento');
-    if (el) {
+    if (el && !el.value) {
         const hoy = new Date();
         const yyyy = hoy.getFullYear();
         const mm = String(hoy.getMonth() + 1).padStart(2, '0');
@@ -70,7 +105,7 @@ window.__seguimientoSortLast = window.__seguimientoSortLast || '';
     // Función para poner la fecha de hoy en el input de devoluciones
     function setFechaHoyDevoluciones() {
         const fechaInput = document.getElementById('fecha_dev');
-        if (fechaInput) {
+        if (fechaInput && !fechaInput.value) {
             const hoy = new Date();
             const yyyy = hoy.getFullYear();
             const mm = String(hoy.getMonth() + 1).padStart(2, '0');
@@ -88,47 +123,287 @@ window.__seguimientoSortLast = window.__seguimientoSortLast || '';
         const val = `${yyyy}-${mm}-${dd}`;
         const f1 = document.getElementById('fecha_recojo_desde');
         const f2 = document.getElementById('fecha_recojo_hasta');
-        if (f1) f1.value = val;
-        if (f2) f2.value = val;
+        if (f1 && !f1.value) f1.value = val;
+        if (f2 && !f2.value) f2.value = val;
         const fSingle = document.getElementById('fecha_recojo');
-        if (fSingle) fSingle.value = val; // compatibilidad si existiera
+        if (fSingle && !fSingle.value) fSingle.value = val; // compatibilidad si existiera
     }
 
 // Mostrar módulo y cargar resumen automáticamente
-window.mostrarModulo = function(modulo) {
-    // Validar permisos por módulo si están disponibles
+const MODULE_PERMISSION_MAP = {
+    'subir':'importar',
+    'consultar':'consultar',
+    'seguimiento':'seguimiento',
+    'resumen':'resumen',
+    'herramientas':'herramientas',
+    'cobranzas':'cobranzas',
+    'devoluciones':'devoluciones',
+    'recojos':'recojos',
+    'admin':'admin',
+    'cuota_mensual':'cuota_mensual',
+    'cuotas_hist':'cuotas_hist',
+    'rutas':'rutas',
+    'ctacte_vendedor':'ctacte_vendedor',
+    'usuarios':'usuarios',
+    'permisos':'permisos',
+    'sesiones':'usuarios',
+    'almacen':'almacen',
+    'inicio': null
+};
+
+const MODULE_TAB_META = {
+    'inicio': { title: 'Inicio', closable: false },
+    'subir': { title: 'Importar', closable: true },
+    'consultar': { title: 'Consulta por vd', closable: true },
+    'seguimiento': { title: 'Seguimiento', closable: true },
+    'resumen': { title: 'Resumen', closable: true },
+    'herramientas': { title: 'Herramientas', closable: true },
+    'cobranzas': { title: 'Cobranzas', closable: true },
+    'devoluciones': { title: 'Devoluciones', closable: true },
+    'recojos': { title: 'Recojos', closable: true },
+    'admin': { title: 'Admin Cuotas', closable: true },
+    'cuota_mensual': { title: 'Cuota Mensual', closable: true },
+    'rutas': { title: 'Rutas', closable: true },
+    'ctacte_vendedor': { title: 'CTACTE/Vendedor', closable: true },
+    'usuarios': { title: 'Usuarios', closable: true },
+    'permisos': { title: 'Permisos', closable: true },
+    'sesiones': { title: 'Usuarios en línea', closable: true },
+    'almacen': { title: 'Almacén', closable: true }
+};
+
+window.__openModuleTabs = window.__openModuleTabs || ['inicio'];
+window.__activeModuleTab = window.__activeModuleTab || 'inicio';
+window.__draggingModuleTab = null;
+
+function normalizeOpenModuleTabs(tabs) {
+    const list = Array.isArray(tabs) ? tabs : [];
+    const seen = new Set();
+    const normalized = [];
+    list.forEach(function(modulo) {
+        if (!MODULE_TAB_META[modulo] || seen.has(modulo)) return;
+        seen.add(modulo);
+        normalized.push(modulo);
+    });
+    if (!normalized.length) normalized.push('inicio');
+    if (!normalized.includes('inicio')) normalized.unshift('inicio');
+    return normalized;
+}
+
+window.__openModuleTabs = normalizeOpenModuleTabs(window.__openModuleTabs);
+
+function canAccessModule(modulo) {
     try {
-        const map = {
-            'subir':'importar',
-            'consultar':'consultar',
-            'seguimiento':'seguimiento',
-            'resumen':'resumen',
-            'herramientas':'herramientas',
-            'cobranzas':'cobranzas',
-            'devoluciones':'devoluciones',
-            'recojos':'recojos',
-            'admin':'admin',
-            'cuota_mensual':'cuota_mensual',
-            'cuotas_hist':'cuotas_hist', // nueva página histórica semanal
-            'rutas':'rutas',
-            'ctacte_vendedor':'ctacte_vendedor',
-            'usuarios':'usuarios',
-            'permisos':'permisos',
-            'sesiones':'usuarios',
-            'almacen':'almacen',
-            'inicio': null
-        };
-        if (modulo && map.hasOwnProperty(modulo) && map[modulo]) {
-            if (window.__PERMS && window.__PERMS[ map[modulo] ] === false) {
-                // Módulo bloqueado: mostrar Inicio y salir
-                const inicio = document.getElementById('modulo-inicio');
-                if (inicio) inicio.style.display = 'block';
-                const ids = ['modulo-subir','modulo-consultar','modulo-resumen','modulo-cobranzas','modulo-admin','modulo-cuota-mensual','modulo-rutas','modulo-usuarios','modulo-permisos','modulo-devoluciones','modulo-recojos','modulo-sesiones'];
-                ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display='none'; });
+        if (!modulo || !MODULE_PERMISSION_MAP.hasOwnProperty(modulo)) return true;
+        const perm = MODULE_PERMISSION_MAP[modulo];
+        if (!perm) return true;
+        return !(window.__PERMS && window.__PERMS[perm] === false);
+    } catch (_) {
+        return true;
+    }
+}
+
+function renderModuleTabs() {
+    const host = document.getElementById('panel-tabs');
+    if (!host) return;
+    window.__openModuleTabs = normalizeOpenModuleTabs(window.__openModuleTabs);
+    if (!window.__openModuleTabs.includes(window.__activeModuleTab)) {
+        window.__activeModuleTab = window.__openModuleTabs[0] || 'inicio';
+    }
+    host.innerHTML = '';
+    window.__openModuleTabs.forEach(function(modulo) {
+        const meta = MODULE_TAB_META[modulo] || { title: modulo, closable: true };
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'panel-tab' + (window.__activeModuleTab === modulo ? ' is-active' : '');
+        tab.setAttribute('data-module-tab', modulo);
+        tab.title = meta.title;
+        if (meta.closable !== false) {
+            tab.draggable = true;
+            tab.classList.add('is-draggable');
+            tab.addEventListener('dragstart', function() {
+                window.__draggingModuleTab = modulo;
+                tab.classList.add('is-dragging');
+            });
+            tab.addEventListener('dragend', function() {
+                window.__draggingModuleTab = null;
+                tab.classList.remove('is-dragging');
+                host.querySelectorAll('.panel-tab').forEach(function(item) {
+                    item.classList.remove('drop-before', 'drop-after');
+                });
+            });
+            tab.addEventListener('dragover', function(e) {
+                if (!window.__draggingModuleTab || window.__draggingModuleTab === modulo) return;
+                e.preventDefault();
+                const rect = tab.getBoundingClientRect();
+                const before = e.clientX < (rect.left + rect.width / 2);
+                tab.classList.toggle('drop-before', before);
+                tab.classList.toggle('drop-after', !before);
+            });
+            tab.addEventListener('dragleave', function() {
+                tab.classList.remove('drop-before', 'drop-after');
+            });
+            tab.addEventListener('drop', function(e) {
+                if (!window.__draggingModuleTab || window.__draggingModuleTab === modulo) return;
+                e.preventDefault();
+                const rect = tab.getBoundingClientRect();
+                const before = e.clientX < (rect.left + rect.width / 2);
+                reorderModuleTab(window.__draggingModuleTab, modulo, before);
+            });
+        }
+
+        const label = document.createElement('span');
+        label.className = 'panel-tab-label';
+        label.textContent = meta.title;
+        tab.appendChild(label);
+
+        if (meta.closable !== false) {
+            const close = document.createElement('span');
+            close.className = 'panel-tab-close';
+            close.setAttribute('data-close-module-tab', modulo);
+            close.setAttribute('aria-hidden', 'true');
+            close.textContent = '×';
+            tab.appendChild(close);
+        }
+
+        tab.addEventListener('click', function(e) {
+            const closeTarget = e.target.closest('[data-close-module-tab]');
+            if (closeTarget) {
+                e.stopPropagation();
+                closeModuleTab(modulo);
                 return;
             }
+            activateModuleTab(modulo);
+        });
+
+        host.appendChild(tab);
+    });
+}
+
+function reorderModuleTab(sourceModulo, targetModulo, insertBefore) {
+    const tabs = normalizeOpenModuleTabs(window.__openModuleTabs);
+    const sourceIndex = tabs.indexOf(sourceModulo);
+    const targetIndex = tabs.indexOf(targetModulo);
+    if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) {
+        window.__openModuleTabs = tabs;
+        renderModuleTabs();
+        return;
+    }
+    const moved = tabs.splice(sourceIndex, 1)[0];
+    let nextIndex = tabs.indexOf(targetModulo);
+    if (nextIndex === -1) nextIndex = tabs.length;
+    if (!insertBefore) nextIndex += 1;
+    tabs.splice(nextIndex, 0, moved);
+    window.__openModuleTabs = normalizeOpenModuleTabs(tabs);
+    renderModuleTabs();
+}
+
+function ensureModuleTab(modulo) {
+    if (!MODULE_TAB_META[modulo]) return;
+    window.__openModuleTabs = normalizeOpenModuleTabs(window.__openModuleTabs.concat(modulo));
+}
+
+function closeModuleTab(modulo) {
+    const meta = MODULE_TAB_META[modulo] || { closable: true };
+    if (meta.closable === false) return;
+    saveModuleState(modulo);
+    const currentTabs = window.__openModuleTabs.slice();
+    const idx = currentTabs.indexOf(modulo);
+    if (idx === -1) return;
+    currentTabs.splice(idx, 1);
+    if (!currentTabs.length) currentTabs.push('inicio');
+    window.__openModuleTabs = normalizeOpenModuleTabs(currentTabs);
+    if (window.__activeModuleTab === modulo) {
+        const fallback = currentTabs[Math.max(0, idx - 1)] || currentTabs[0] || 'inicio';
+        window.__activeModuleTab = fallback;
+        activateModuleContent(fallback);
+    } else {
+        renderModuleTabs();
+    }
+}
+
+function activateModuleTab(modulo) {
+    if (!MODULE_TAB_META[modulo]) modulo = 'inicio';
+    if (window.__activeModuleTab && window.__activeModuleTab !== modulo) {
+        saveModuleState(window.__activeModuleTab);
+    }
+    window.__activeModuleTab = modulo;
+    activateModuleContent(modulo);
+}
+
+function openModuleTab(modulo) {
+    if (!canAccessModule(modulo)) {
+        modulo = 'inicio';
+    }
+    if (!MODULE_TAB_META[modulo]) modulo = 'inicio';
+    ensureModuleTab(modulo);
+    activateModuleTab(modulo);
+}
+
+function getModuleSection(modulo) {
+    const sectionIdMap = {
+        inicio: 'modulo-inicio',
+        subir: 'modulo-subir',
+        consultar: 'modulo-consultar',
+        seguimiento: 'modulo-seguimiento',
+        resumen: 'modulo-resumen',
+        herramientas: 'modulo-herramientas',
+        cobranzas: 'modulo-cobranzas',
+        devoluciones: 'modulo-devoluciones',
+        recojos: 'modulo-recojos',
+        admin: 'modulo-admin',
+        cuota_mensual: 'modulo-cuota-mensual',
+        rutas: 'modulo-rutas',
+        ctacte_vendedor: 'modulo-ctacte-vendedor',
+        usuarios: 'modulo-usuarios',
+        permisos: 'modulo-permisos',
+        sesiones: 'modulo-sesiones',
+        almacen: 'modulo-almacen'
+    };
+    const sectionId = sectionIdMap[modulo];
+    return sectionId ? document.getElementById(sectionId) : null;
+}
+
+window.__moduleTabState = window.__moduleTabState || {};
+
+function saveModuleState(modulo) {
+    const section = getModuleSection(modulo);
+    if (!section) return;
+    const state = {};
+    section.querySelectorAll('input, select, textarea').forEach(function(field) {
+        const key = field.id || field.name;
+        if (!key || field.type === 'file') return;
+        if (field.type === 'checkbox' || field.type === 'radio') state[key] = !!field.checked;
+        else state[key] = field.value;
+    });
+    if (modulo === 'seguimiento') {
+        state.__sortPrev = window.__seguimientoSortPrev || '';
+        state.__sortLast = window.__seguimientoSortLast || '';
+    }
+    window.__moduleTabState[modulo] = state;
+}
+
+function restoreModuleState(modulo) {
+    const section = getModuleSection(modulo);
+    const state = window.__moduleTabState[modulo];
+    if (!section || !state) return;
+    Object.keys(state).forEach(function(key) {
+        if (key === '__sortPrev' || key === '__sortLast') return;
+        let field = document.getElementById(key);
+        if (field && !section.contains(field)) field = null;
+        if (!field) {
+            field = section.querySelector('[name="' + key.replace(/"/g, '\\"') + '"]');
         }
-    } catch(_){}
+        if (!field || field.type === 'file') return;
+        if (field.type === 'checkbox' || field.type === 'radio') field.checked = !!state[key];
+        else field.value = state[key];
+    });
+    if (modulo === 'seguimiento') {
+        window.__seguimientoSortPrev = state.__sortPrev || '';
+        window.__seguimientoSortLast = state.__sortLast || '';
+    }
+}
+
+function activateModuleContent(modulo) {
     const inicio = document.getElementById('modulo-inicio');
     if (inicio) inicio.style.display = (modulo === 'inicio') ? 'block' : 'none';
     document.getElementById('modulo-subir').style.display = (modulo === 'subir') ? 'block' : 'none';
@@ -177,6 +452,7 @@ window.mostrarModulo = function(modulo) {
     if (modulo === 'resumen') {
         // Esperar a que el DOM renderice el input de fecha
         setTimeout(function() {
+            restoreModuleState('resumen');
             setFechaHoyResumen();
             const fechaInput = document.getElementById('fecha_resumen');
             if (fechaInput) {
@@ -188,9 +464,13 @@ window.mostrarModulo = function(modulo) {
         }, 100);
     } else if (modulo === 'seguimiento') {
         setTimeout(function(){
+            restoreModuleState('seguimiento');
             setFechaHoySeguimiento();
             const f = document.getElementById('fecha_seguimiento');
-            if (f && f.value) cargarSeguimiento(f.value);
+            if (f && f.value) cargarSeguimiento(f.value, {
+                sortPrev: window.__seguimientoSortPrev || '',
+                sortLast: window.__seguimientoSortLast || ''
+            });
         }, 100);
     } else if (modulo === 'admin') {
         // Cargar lista de cuotas
@@ -206,12 +486,14 @@ window.mostrarModulo = function(modulo) {
             setTimeout(function(){ initCuotaMensualModule(); cargarCuotaMensual(); }, 50);
         } else if (modulo === 'devoluciones') {
             setTimeout(function(){
+                restoreModuleState('devoluciones');
                 setFechaHoyDevoluciones();
                 const f = document.getElementById('fecha_dev');
                 if (f) cargarDevoluciones();
             }, 100);
         } else if (modulo === 'recojos') {
             setTimeout(function(){
+                restoreModuleState('recojos');
                 setFechaHoyRecojos();
                 const cont = document.getElementById('recojos');
                 if (cont) cont.innerHTML = '<p>Ingrese Vendedor y presione Consultar.</p>';
@@ -243,6 +525,11 @@ window.mostrarModulo = function(modulo) {
         } else if (modulo === 'almacen') {
             setTimeout(function(){ initAlmacen(); }, 50);
     }
+    renderModuleTabs();
+}
+
+window.mostrarModulo = function(modulo) {
+    openModuleTab(modulo || 'inicio');
 }
 
 // Herramientas: inicialización y acciones
@@ -574,9 +861,9 @@ function cargarSeguimiento(fecha, sortState){
             if (sortPrevBtn) {
                 sortPrevBtn.addEventListener('click', function(){
                     const fechaActual = document.getElementById('fecha_seguimiento') ? document.getElementById('fecha_seguimiento').value : '';
-                    const nextSortPrev = this.getAttribute('data-sort-prev') || 'asc';
+                    const nextSortPrev = this.getAttribute('data-sort-prev');
                     cargarSeguimiento(fechaActual, {
-                        sortPrev: nextSortPrev,
+                        sortPrev: nextSortPrev === null ? 'asc' : nextSortPrev,
                         sortLast: ''
                     });
                 });
@@ -584,10 +871,10 @@ function cargarSeguimiento(fecha, sortState){
             if (sortBtn) {
                 sortBtn.addEventListener('click', function(){
                     const fechaActual = document.getElementById('fecha_seguimiento') ? document.getElementById('fecha_seguimiento').value : '';
-                    const nextSort = this.getAttribute('data-sort-last') || 'asc';
+                    const nextSort = this.getAttribute('data-sort-last');
                     cargarSeguimiento(fechaActual, {
                         sortPrev: '',
-                        sortLast: nextSort
+                        sortLast: nextSort === null ? 'asc' : nextSort
                     });
                 });
             }
@@ -597,6 +884,7 @@ function cargarSeguimiento(fecha, sortState){
 
 // Evento para el formulario de resumen
 document.addEventListener('DOMContentLoaded', function() {
+    initThemeToggle();
     // Flag de dispositivo móvil para forzar layout responsive aunque haya CSS viejo cacheado
     function applyMobileFlag(){
         try {

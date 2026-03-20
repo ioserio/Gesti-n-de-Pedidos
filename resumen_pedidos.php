@@ -142,7 +142,7 @@ if ($result->num_rows > 0) {
     }
 
     echo '<div class="resumen-table-wrap">';
-    echo '<table class="resumen-desktop">';
+    echo '<table class="resumen-desktop' . ($groupSup ? ' is-grouped' : '') . '">';
     echo '<tr><th colspan="' . ($groupSup ? '6' : '8') . '" class="resumen-top-cell">';
     $pctGlobalRaw = $total_cuota > 0 ? (($total_monto / $total_cuota) * 100) : 0;
     $pctGlobal = ($pctGlobalRaw < 100) ? floor($pctGlobalRaw) : round($pctGlobalRaw);
@@ -154,7 +154,6 @@ if ($result->num_rows > 0) {
     echo '<span class="kpi-chip kpi-faltante">Faltante S/ <b>' . number_format($total_faltante_view, 2, '.', ',') . '</b></span>';
     echo '</div>';
     echo '<div class="resumen-avance-block">';
-    echo '<span class="kpi-chip kpi-avance">Avance <b>' . $pctGlobal . '%</b></span>';
     echo '<span class="kpi-progress-wrap">' . renderResumenProgress((float)$pctGlobal, 'progress-global') . '</span>';
     echo '</div>';
     echo '</div>';
