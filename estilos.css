@@ -816,6 +816,14 @@ th {
     border-radius: 8px;
     background: #fff;
 }
+@media (min-width: 1400px) {
+    #modulo-seguimiento,
+    #modulo-resumen {
+        width: min(100%, 1320px);
+        margin: 0 auto;
+        box-sizing: border-box;
+    }
+}
 #resumen-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;
@@ -1047,8 +1055,8 @@ th {
 }
 #modulo-resumen .kpi-progress-wrap .progress-global {
     margin-left: 0;
-    width: 360px;
-    max-width: 44vw;
+    width: 216px;
+    max-width: 26vw;
     height: 25px;
 }
 #modulo-resumen .avance-cell .seg-progress {
