@@ -115,7 +115,7 @@ if (!$logoExists && file_exists(__DIR__ . '/imagenes/' . strtolower($logoFile)))
 }
 // Construir URL con versión para evitar caché
 if ($logoExists) {
-    $logoUrl = $logoRel . '?v=' . urlencode($assetVersion);
+    $logoUrl = asset_url($logoRel);
 } else {
     $logoUrl = '';
 }
@@ -126,7 +126,7 @@ if ($logoExists) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Iniciar sesión - RikFlex</title>
-    <link rel="stylesheet" href="estilos.css?v=<?php echo $assetVersion; ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url('estilos.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <style>
         :root { --pad: 24px; }
         html, body { height: 100%; }
@@ -212,7 +212,7 @@ if ($logoExists) {
 <div class="login-wrap">
     <div class="login-card">
         <div class="login-title">
-            <img src="<?php echo $logoUrl ?: 'Logo_sinfondo2.png?v=' . urlencode($assetVersion); ?>" alt="Logo" class="login-logo">
+            <img src="<?php echo htmlspecialchars($logoUrl ?: asset_url('Logo_sinfondo2.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="Logo" class="login-logo">
             <h1>Iniciar sesión</h1>
         </div>
         <div class="login-welcome">Bienvenido, ingresa tus credenciales para acceder al sistema.</div>

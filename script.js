@@ -740,10 +740,6 @@ function initImportFormsAjax(){
             .then(txt => { lbl.textContent = txt; })
             .catch(() => { lbl.textContent = 'Ultima actualizacion: -'; });
     }
-function isResumenChartChecked() {
-    const chk = document.getElementById('resumen_chart_chk');
-    return !!(chk && chk.checked);
-}
 function cargarResumen(fecha) {
     const resumen = document.getElementById('resumen');
     const supervisor = document.getElementById('supervisor_resumen') ? document.getElementById('supervisor_resumen').value : '';
@@ -771,7 +767,6 @@ function cargarResumen(fecha) {
 function cargarResumenHistorico(fecha) {
     const cont = document.getElementById('resumen-historico');
     const supervisor = document.getElementById('supervisor_resumen') ? document.getElementById('supervisor_resumen').value : '';
-    const showMonthChart = isResumenChartChecked();
     if (!cont) return;
     cont.innerHTML = '<p>Cargando histórico...</p>';
 
@@ -779,15 +774,13 @@ function cargarResumenHistorico(fecha) {
     if (supervisor) {
         url += '&supervisor=' + encodeURIComponent(supervisor);
     }
-    if (showMonthChart) {
-        url += '&show_month_chart=1';
-    }
 
     fetch(url)
         .then(res => res.text())
         .then(html => {
             cont.innerHTML = html;
             initResumenChartTooltips(cont);
+            applyResumenCuotaBiState(cont);
         })
         .catch(() => {
             cont.innerHTML = '<p>Error al consultar histórico.</p>';
@@ -902,6 +895,69 @@ function refreshResumenDashboard(fecha) {
     cargarResumenHistorico(fecha);
 }
 
+let __resumenFlipCardWired = false;
+window.__resumenCuotaBiActive = window.__resumenCuotaBiActive || false;
+
+function formatResumenMoneyValue(value) {
+    const num = Number(value || 0);
+    return 'S/ ' + num.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+}
+
+function applyResumenCuotaBiState(root) {
+    const scope = root || document;
+    const cards = scope.querySelectorAll('#resumen-historico .cuota-mes-side');
+    cards.forEach(function(card) {
+        const checked = !!window.__resumenCuotaBiActive;
+        card.classList.toggle('is-bi', checked);
+        card.querySelectorAll('.cuota-mes-bi-check').forEach(function(chk) {
+            chk.checked = checked;
+        });
+        card.querySelectorAll('.cuota-mes-money').forEach(function(el) {
+            const nextValue = checked ? el.getAttribute('data-bi') : el.getAttribute('data-igv');
+            el.textContent = formatResumenMoneyValue(nextValue);
+        });
+    });
+}
+
+function initResumenDashboardInteractions() {
+    if (__resumenFlipCardWired) return;
+    __resumenFlipCardWired = true;
+
+    function toggleResumenCuotaCard(card) {
+        if (!card) return;
+        card.classList.toggle('is-flipped');
+    }
+
+    document.addEventListener('click', function(e) {
+        const hint = e.target.closest('#resumen-historico .cuota-mes-flip-hint');
+        if (!hint) return;
+        e.preventDefault();
+        toggleResumenCuotaCard(hint.closest('.cuota-mes-side'));
+    });
+
+    document.addEventListener('change', function(e) {
+        const biCheck = e.target.closest('#resumen-historico .cuota-mes-bi-check');
+        if (!biCheck) return;
+        window.__resumenCuotaBiActive = !!biCheck.checked;
+        applyResumenCuotaBiState(document.getElementById('resumen-historico'));
+    });
+
+    document.addEventListener('dblclick', function(e) {
+        const card = e.target.closest('#resumen-historico .cuota-mes-side');
+        if (!card) return;
+
+        if (e.target.closest('a, input, select, textarea, label, .hm, .seg-progress, .cuota-mes-breakdown, .cuota-mes-corner-actions')) {
+            return;
+        }
+
+        e.preventDefault();
+        toggleResumenCuotaCard(card);
+    });
+}
+
 // Cargar seguimiento por rangos horarios
 function cargarSeguimiento(fecha, sortState){
     const cont = document.getElementById('seguimiento');
@@ -961,6 +1017,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', applyMobileFlag);
 
     initImportFormsAjax();
+    initResumenDashboardInteractions();
 
     const formResumen = document.getElementById('form-resumen');
     if (formResumen) {
@@ -994,13 +1051,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const admChk = document.getElementById('resumen_adm_chk');
         if (admChk) {
             admChk.addEventListener('change', function(){
-                const fecha = document.getElementById('fecha_resumen').value;
-                refreshResumenDashboard(fecha);
-            });
-        }
-        const chartChk = document.getElementById('resumen_chart_chk');
-        if (chartChk) {
-            chartChk.addEventListener('change', function(){
                 const fecha = document.getElementById('fecha_resumen').value;
                 refreshResumenDashboard(fecha);
             });

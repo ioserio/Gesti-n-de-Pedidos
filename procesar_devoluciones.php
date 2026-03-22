@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/require_login.php';
+require_once __DIR__ . '/init.php';
 // procesar_devoluciones.php
 // Sube el Excel DEVOLUCIONES POR CLIENTE.xlsx y carga datos en la tabla devoluciones_por_cliente
 
@@ -210,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_devoluciones
 
         respondImport(true, 'Devoluciones importadas correctamente. Filas: ' . (int)$insertadas, 200, ['rows' => (int)$insertadas]);
 
-        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=1280"><title>Devoluciones importadas</title><link rel="stylesheet" href="estilos.css"></head><body>';
+        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=1280"><title>Devoluciones importadas</title><link rel="stylesheet" href="' . htmlspecialchars(asset_url('estilos.css'), ENT_QUOTES, 'UTF-8') . '"></head><body>';
         echo '<div class="container">';
         echo '<h2>¡Devoluciones importadas correctamente!</h2>';
         echo '<p>Tabla: <code>devoluciones_por_cliente</code></p>';
@@ -219,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_devoluciones
 
     } catch (Throwable $e) {
         respondImport(false, 'Error al procesar devoluciones: ' . $e->getMessage(), 500);
-        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=1280"><title>Error</title><link rel="stylesheet" href="estilos.css"></head><body>';
+        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=1280"><title>Error</title><link rel="stylesheet" href="' . htmlspecialchars(asset_url('estilos.css'), ENT_QUOTES, 'UTF-8') . '"></head><body>';
         echo '<div class="container">';
         echo '<h2>Error al procesar devoluciones</h2>';
         echo '<pre style="white-space:pre-wrap;background:#f8f8f8;padding:12px;border:1px solid #ddd;border-radius:6px;">' . htmlspecialchars($e->getMessage()) . '</pre>';

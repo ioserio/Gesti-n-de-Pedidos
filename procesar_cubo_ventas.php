@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/require_login.php';
+require_once __DIR__ . '/init.php';
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -24,7 +25,7 @@ function respondImport($ok, $message, $statusCode = 200, $extra = []) {
     }
 
     if ($ok) {
-        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Importacion de Cubo de Ventas</title><link rel="stylesheet" href="estilos.css"></head><body><div class="container">';
+        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Importacion de Cubo de Ventas</title><link rel="stylesheet" href="' . htmlspecialchars(asset_url('estilos.css'), ENT_QUOTES, 'UTF-8') . '"></head><body><div class="container">';
         echo '<h2>!Cubo de ventas importado correctamente!</h2>';
         echo '<p>' . htmlspecialchars((string)$message, ENT_QUOTES, 'UTF-8') . '</p>';
         echo '<a href="index.php">Volver</a>';
@@ -33,7 +34,7 @@ function respondImport($ok, $message, $statusCode = 200, $extra = []) {
     }
 
     http_response_code((int)$statusCode);
-    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Error</title><link rel="stylesheet" href="estilos.css"></head><body><div class="container">';
+    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Error</title><link rel="stylesheet" href="' . htmlspecialchars(asset_url('estilos.css'), ENT_QUOTES, 'UTF-8') . '"></head><body><div class="container">';
     echo '<h2>Error al importar cubo de ventas</h2>';
     echo '<pre style="white-space:pre-wrap;background:#f8f8f8;padding:12px;border:1px solid #ddd;border-radius:6px;">' . htmlspecialchars((string)$message, ENT_QUOTES, 'UTF-8') . '</pre>';
     echo '<a href="index.php">Volver</a>';

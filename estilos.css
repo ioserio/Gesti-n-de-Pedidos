@@ -1013,8 +1013,106 @@ th {
     border: 1px solid #d8e4f2;
     border-radius: 8px;
     background: #fff;
-    padding: 10px;
+    padding: 0;
     margin-bottom: 10px;
+    perspective: 1200px;
+    overflow: hidden;
+}
+#modulo-resumen .cuota-mes-card-inner {
+    position: relative;
+    min-height: 248px;
+    transform-style: preserve-3d;
+    transition: transform .55s cubic-bezier(.22, .61, .36, 1);
+}
+#modulo-resumen .cuota-mes-side.is-flipped .cuota-mes-card-inner {
+    transform: rotateY(180deg);
+}
+#modulo-resumen .cuota-mes-face {
+    position: relative;
+    min-height: 248px;
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+#modulo-resumen .cuota-mes-face.is-back {
+    position: absolute;
+    inset: 0;
+    transform: rotateY(180deg);
+}
+#modulo-resumen .cuota-mes-breakdown {
+    margin-top: 6px;
+}
+#modulo-resumen .cuota-mes-corner-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+#modulo-resumen .cuota-mes-flip-hint {
+    position: static;
+    min-width: 0;
+    margin: 0;
+    padding: 2px 7px;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.92);
+    color: #475569;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+#modulo-resumen .cuota-mes-flip-hint:hover {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+}
+#modulo-resumen .cuota-mes-bi-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    padding: 2px 7px;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.92);
+    color: #475569;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .35px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    user-select: none;
+}
+#modulo-resumen .cuota-mes-bi-hint input {
+    width: 12px;
+    height: 12px;
+    margin: 0;
+    accent-color: #2563eb;
+}
+#modulo-resumen .cuota-mes-bi-hint:hover {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+}
+#modulo-resumen .cuota-mes-face-note {
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px dashed #d8e4f2;
+    color: #6b7280;
+    font-size: 11px;
+    line-height: 1.25;
 }
 #modulo-resumen .historico-chart-side {
     border: 1px solid #d8e4f2;
@@ -1832,6 +1930,32 @@ body.dark-theme #modulo-resumen .chart-metric b {
 }
 body.dark-theme #modulo-resumen .historico-metrics-grid .hm small {
     color: #94a3b8;
+}
+body.dark-theme #modulo-resumen .cuota-mes-face-note {
+    border-top-color: #243247;
+    color: #94a3b8;
+}
+body.dark-theme #modulo-resumen .cuota-mes-flip-hint {
+    background: rgba(15, 23, 42, 0.95);
+    border-color: #314158;
+    color: #cbd5e1;
+    box-shadow: none;
+}
+body.dark-theme #modulo-resumen .cuota-mes-flip-hint:hover {
+    background: #182438;
+    border-color: #475569;
+    color: #f8fafc;
+}
+body.dark-theme #modulo-resumen .cuota-mes-bi-hint {
+    background: rgba(15, 23, 42, 0.95);
+    border-color: #314158;
+    color: #cbd5e1;
+    box-shadow: none;
+}
+body.dark-theme #modulo-resumen .cuota-mes-bi-hint:hover {
+    background: #182438;
+    border-color: #475569;
+    color: #f8fafc;
 }
 body.dark-theme #modulo-resumen .historico-metrics-grid .hm b,
 body.dark-theme .seg-mobile .seg-vendor,

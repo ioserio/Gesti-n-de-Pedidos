@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/require_login.php';
+require_once __DIR__ . '/init.php';
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -159,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo_clientes']))
         'actualizados' => (int)$actualizados,
     ]);
 
-    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Importación de Clientes (CSV)</title><link rel="stylesheet" href="estilos.css"></head><body><div class="container">';
+    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Importación de Clientes (CSV)</title><link rel="stylesheet" href="' . htmlspecialchars(asset_url('estilos.css'), ENT_QUOTES, 'UTF-8') . '"></head><body><div class="container">';
     echo '<h2>Importación de cartera de clientes (CSV)</h2>';
     echo '<p><b>Insertados:</b> ' . (int)$insertados . ' &nbsp; <b>Actualizados:</b> ' . (int)$actualizados . '</p>';
     echo '<a href="index.php">Volver</a>';
