@@ -82,6 +82,14 @@ function parse_excel_date($value) {
         return sprintf('%04d-%02d-%02d', (int)$match[3], (int)$match[2], (int)$match[1]);
     }
 
+    if (preg_match('/^(\d{1,2})-(\d{1,2})-(\d{4})$/', $raw, $match)) {
+        return sprintf('%04d-%02d-%02d', (int)$match[3], (int)$match[2], (int)$match[1]);
+    }
+
+    if (preg_match('/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/', $raw, $match)) {
+        return sprintf('%04d-%02d-%02d', (int)$match[3], (int)$match[2], (int)$match[1]);
+    }
+
     try {
         return (new DateTime($raw))->format('Y-m-d');
     } catch (Throwable $e) {
@@ -197,6 +205,26 @@ function parse_nullable_text($value) {
 
     $text = trim((string)$value);
     return $text === '' ? null : $text;
+}
+
+function build_date_from_parts($year, $month, $day) {
+    if ($year === null || $month === null || $day === null) {
+        return null;
+    }
+
+    $year = (int)$year;
+    $month = (int)$month;
+    $day = (int)$day;
+
+    if ($year < 2000 || $year > 2100 || $month < 1 || $month > 12 || $day < 1 || $day > 31) {
+        return null;
+    }
+
+    if (!checkdate($month, $day, $year)) {
+        return null;
+    }
+
+    return sprintf('%04d-%02d-%02d', $year, $month, $day);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_FILES['archivo_cubo_ventas'])) {
@@ -328,8 +356,10 @@ try {
         throw new Exception('Error al preparar la insercion: ' . $mysqli->error);
     }
 
-    $mysqli->begin_transaction();
-    $insertedRows = 0;
+    $recordsToInsert = [];
+    $datesToReplace = [];
+    $skippedInvalidDate = 0;
+    $skippedInvalidDateRows = [];
 
     for ($rowIndex = 1; $rowIndex < count($rows); $rowIndex++) {
         $row = is_array($rows[$rowIndex]) ? $rows[$rowIndex] : [];
@@ -349,6 +379,55 @@ try {
             continue;
         }
 
+        if (empty($record['fecha'])) {
+            $record['fecha'] = build_date_from_parts($record['ano'] ?? null, $record['mes'] ?? null, $record['dia'] ?? null);
+        }
+
+        if (empty($record['fecha'])) {
+            $skippedInvalidDate++;
+            if (count($skippedInvalidDateRows) < 15) {
+                $skippedInvalidDateRows[] = $rowIndex + 1;
+            }
+            continue;
+        }
+
+        $recordsToInsert[] = $record;
+        $datesToReplace[$record['fecha']] = true;
+    }
+
+    if (empty($recordsToInsert)) {
+        throw new Exception('El archivo no contiene filas validas para importar.');
+    }
+
+    if (empty($_POST['truncate']) && empty($datesToReplace)) {
+        throw new Exception('No se pudo detectar ninguna fecha valida en el archivo para reemplazar los documentos existentes.');
+    }
+
+    $mysqli->begin_transaction();
+    $deletedRows = 0;
+    $insertedRows = 0;
+
+    if (empty($_POST['truncate']) && !empty($datesToReplace)) {
+        $replaceDates = array_keys($datesToReplace);
+        $placeholders = implode(',', array_fill(0, count($replaceDates), '?'));
+        $deleteSql = 'DELETE FROM `cubo_de_ventas_resumen` WHERE `fecha` IN (' . $placeholders . ')';
+        $deleteStmt = $mysqli->prepare($deleteSql);
+        if (!$deleteStmt) {
+            throw new Exception('Error al preparar el reemplazo por fecha: ' . $mysqli->error);
+        }
+
+        $deleteTypes = str_repeat('s', count($replaceDates));
+        $deleteStmt->bind_param($deleteTypes, ...$replaceDates);
+        if (!$deleteStmt->execute()) {
+            $deleteStmt->close();
+            throw new Exception('Error al eliminar registros existentes de las fechas detectadas: ' . $deleteStmt->error);
+        }
+
+        $deletedRows = $deleteStmt->affected_rows;
+        $deleteStmt->close();
+    }
+
+    foreach ($recordsToInsert as $record) {
         $stmt->bind_param(
             'issisissssiiisiiiiddii',
             $record['codigovendedor'],
@@ -383,11 +462,49 @@ try {
         $insertedRows++;
     }
 
+    $persistedRows = 0;
+    if (!empty($datesToReplace)) {
+        $replaceDates = array_keys($datesToReplace);
+        $placeholders = implode(',', array_fill(0, count($replaceDates), '?'));
+        $countSql = 'SELECT COUNT(*) AS total FROM `cubo_de_ventas_resumen` WHERE `fecha` IN (' . $placeholders . ')';
+        $countStmt = $mysqli->prepare($countSql);
+        if (!$countStmt) {
+            throw new Exception('Error al validar filas persistidas: ' . $mysqli->error);
+        }
+        $countTypes = str_repeat('s', count($replaceDates));
+        $countStmt->bind_param($countTypes, ...$replaceDates);
+        if (!$countStmt->execute()) {
+            $countStmt->close();
+            throw new Exception('Error al contar filas persistidas: ' . $countStmt->error);
+        }
+        $countResult = $countStmt->get_result();
+        $persistedRows = (int)(($countResult && ($rowCount = $countResult->fetch_assoc())) ? ($rowCount['total'] ?? 0) : 0);
+        $countStmt->close();
+    }
+
     $mysqli->commit();
     $stmt->close();
     $mysqli->close();
 
-    respondImport(true, 'Se importaron ' . (int)$insertedRows . ' filas a cubo_de_ventas_resumen.', 200, ['rows' => (int)$insertedRows]);
+    $message = 'Se importaron ' . (int)$insertedRows . ' filas a cubo_de_ventas_resumen.';
+    if (empty($_POST['truncate']) && !empty($datesToReplace)) {
+        $message .= ' Se reemplazaron los registros existentes de ' . count($datesToReplace) . ' fecha(s) y se eliminaron ' . (int)$deletedRows . ' fila(s) previas.';
+    }
+    if ($skippedInvalidDate > 0) {
+        $message .= ' Se omitieron ' . (int)$skippedInvalidDate . ' fila(s) sin fecha válida.';
+    }
+    if (!empty($datesToReplace)) {
+        $message .= ' Filas persistidas para las fechas detectadas: ' . (int)$persistedRows . '.';
+    }
+
+    respondImport(true, $message, 200, [
+        'rows' => (int)$insertedRows,
+        'deleted_rows' => (int)$deletedRows,
+        'replaced_dates' => array_keys($datesToReplace),
+        'persisted_rows' => (int)$persistedRows,
+        'skipped_invalid_date_rows' => (int)$skippedInvalidDate,
+        'skipped_invalid_date_row_numbers' => $skippedInvalidDateRows
+    ]);
 } catch (Throwable $e) {
     if (isset($mysqli) && $mysqli instanceof mysqli) {
         try {

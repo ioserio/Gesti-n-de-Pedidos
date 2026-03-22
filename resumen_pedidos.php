@@ -18,6 +18,266 @@ $vd_supervisor = [
     '115'=>'CARLOS','116'=>'CARLOS','119'=>'CARLOS','604'=>'FRANCISCO','605'=>'FRANCISCO'
 ];
 
+function vendorCodeVariants(string $vendorCode): array {
+    $raw = trim($vendorCode);
+    $noZeros = ltrim($raw, '0');
+    if ($noZeros === '') {
+        $noZeros = '0';
+    }
+    $padded = str_pad($noZeros, 3, '0', STR_PAD_LEFT);
+    return [$raw, $noZeros, $padded];
+}
+
+function resolveSupervisorForVendor(string $vendorCode, array $vdSupervisor): string {
+    [$raw, $noZeros, $padded] = vendorCodeVariants($vendorCode);
+    if (isset($vdSupervisor[$raw])) return $vdSupervisor[$raw];
+    if (isset($vdSupervisor[$noZeros])) return $vdSupervisor[$noZeros];
+    if (isset($vdSupervisor[$padded])) return $vdSupervisor[$padded];
+    return '';
+}
+
+function resolveVendorQuota(array $cuotas, string $vendorCode): float {
+    [$raw, $noZeros, $padded] = vendorCodeVariants($vendorCode);
+    if (isset($cuotas[$raw])) return (float)$cuotas[$raw];
+    if (isset($cuotas[$noZeros])) return (float)$cuotas[$noZeros];
+    if (isset($cuotas[$padded])) return (float)$cuotas[$padded];
+    return 0.0;
+}
+
+function loadCuotasForDate(mysqli $mysqli, string $fecha): array {
+    static $cache = [];
+    if (isset($cache[$fecha])) {
+        return $cache[$fecha];
+    }
+
+    $dow = intval(date('N', strtotime($fecha)));
+    $cuotas = [];
+    $qh = $mysqli->prepare("SELECT Cod_Vendedor, Cuota, vigente_desde FROM cuotas_vendedor_hist WHERE Dia_Semana=? AND vigente_desde<=? ORDER BY Cod_Vendedor ASC, vigente_desde DESC");
+    if ($qh) {
+        $qh->bind_param('is', $dow, $fecha);
+        $qh->execute();
+        $rh = $qh->get_result();
+        $seen = [];
+        while ($rowq = $rh->fetch_assoc()) {
+            $vd = (string)$rowq['Cod_Vendedor'];
+            if (!isset($seen[$vd])) {
+                $cuotas[$vd] = (float)$rowq['Cuota'];
+                $seen[$vd] = true;
+            }
+        }
+        $qh->close();
+    }
+
+    if (count($cuotas) === 0) {
+        $q = $mysqli->prepare("SELECT Cod_Vendedor, Cuota FROM cuotas_vendedor WHERE Dia_Semana=?");
+        if ($q) {
+            $q->bind_param('i', $dow);
+            $q->execute();
+            $r = $q->get_result();
+            while ($rowq = $r->fetch_assoc()) {
+                $cuotas[(string)$rowq['Cod_Vendedor']] = (float)$rowq['Cuota'];
+            }
+            $q->close();
+        }
+    }
+
+    $cache[$fecha] = $cuotas;
+    return $cuotas;
+}
+
+function buildResumenChartPath(array $values, float $left, float $top, float $width, float $height, float $maxValue): string {
+    $points = count($values);
+    if ($points === 0) {
+        return '';
+    }
+    if ($maxValue <= 0) {
+        $maxValue = 1;
+    }
+
+    $stepX = $points > 1 ? ($width / ($points - 1)) : 0;
+    $path = '';
+    $started = false;
+    foreach ($values as $index => $value) {
+        if ($value === null) {
+            $started = false;
+            continue;
+        }
+        $x = $left + ($stepX * $index);
+        $y = $top + $height - (($value / $maxValue) * $height);
+        $path .= ($started ? ' L ' : 'M ') . number_format($x, 2, '.', '') . ' ' . number_format($y, 2, '.', '');
+        $started = true;
+    }
+    return trim($path);
+}
+
+function renderResumenMonthChart(mysqli $mysqli, string $fecha, string $supervisor, array $vdSupervisor): string {
+    try {
+        $selectedDate = new DateTimeImmutable($fecha);
+    } catch (Throwable $e) {
+        return '';
+    }
+
+    $monthStart = $selectedDate->modify('first day of this month');
+    $monthEnd = $selectedDate->modify('last day of this month');
+    $monthStartStr = $monthStart->format('Y-m-d');
+    $monthEndStr = $monthEnd->format('Y-m-d');
+    $selectedDateStr = $selectedDate->format('Y-m-d');
+
+    $salesByDay = [];
+    $stmtMonth = $mysqli->prepare("SELECT Fecha, Cod_Vendedor, SUM(CAST(REPLACE(Total_IGV, ',', '') AS DECIMAL(12,2))) AS total_igv FROM pedidos_x_dia WHERE Fecha BETWEEN ? AND ? GROUP BY Fecha, Cod_Vendedor ORDER BY Fecha ASC, Cod_Vendedor ASC");
+    if ($stmtMonth) {
+        $stmtMonth->bind_param('ss', $monthStartStr, $monthEndStr);
+        $stmtMonth->execute();
+        $resultMonth = $stmtMonth->get_result();
+        while ($row = $resultMonth->fetch_assoc()) {
+            $vendorCode = (string)$row['Cod_Vendedor'];
+            $vendorSupervisor = resolveSupervisorForVendor($vendorCode, $vdSupervisor);
+            if ($supervisor !== '' && $vendorSupervisor !== $supervisor) {
+                continue;
+            }
+            $day = (string)$row['Fecha'];
+            if (!isset($salesByDay[$day])) {
+                $salesByDay[$day] = 0.0;
+            }
+            $salesByDay[$day] += (float)$row['total_igv'];
+        }
+        $stmtMonth->close();
+    }
+
+    $chartDates = [];
+    $days = [];
+    $salesValues = [];
+    $quotaValues = [];
+    $dailyQuotaByDay = [];
+    $dailySalesByDay = [];
+    $maxValue = 0.0;
+    $cursor = $monthStart;
+
+    while ($cursor <= $monthEnd) {
+        $dayStr = $cursor->format('Y-m-d');
+
+        $dailyQuota = 0.0;
+        foreach (loadCuotasForDate($mysqli, $dayStr) as $vendorCode => $quotaValue) {
+            $vendorSupervisor = resolveSupervisorForVendor((string)$vendorCode, $vdSupervisor);
+            if ($supervisor !== '' && $vendorSupervisor !== $supervisor) {
+                continue;
+            }
+            $dailyQuota += (float)$quotaValue;
+        }
+
+        $dailySale = ($dayStr <= $selectedDateStr) ? (float)($salesByDay[$dayStr] ?? 0.0) : null;
+        $dailyQuotaByDay[$dayStr] = $dailyQuota;
+        $dailySalesByDay[$dayStr] = $dailySale;
+
+        if ((int)$cursor->format('N') === 7) {
+            $cursor = $cursor->modify('+1 day');
+            continue;
+        }
+
+        $chartDates[] = $dayStr;
+        $days[] = $cursor->format('j');
+        $quotaValues[] = $dailyQuota;
+        $salesValues[] = $dailySale;
+        $maxValue = max($maxValue, $dailyQuota, $dailySale ?? 0.0);
+        $cursor = $cursor->modify('+1 day');
+    }
+
+    if (empty($chartDates)) {
+        return '';
+    }
+
+    $selectedSale = (float)($dailySalesByDay[$selectedDateStr] ?? 0.0);
+    $selectedQuota = (float)($dailyQuotaByDay[$selectedDateStr] ?? 0.0);
+    $selectedPctRaw = $selectedQuota > 0 ? (($selectedSale / $selectedQuota) * 100) : 0;
+    $selectedPct = ($selectedPctRaw < 100) ? floor($selectedPctRaw) : round($selectedPctRaw);
+
+    $width = 860;
+    $height = 236;
+    $left = 42;
+    $top = 16;
+    $right = 16;
+    $bottom = 42;
+    $plotWidth = $width - $left - $right;
+    $plotHeight = $height - $top - $bottom;
+    $stepX = count($chartDates) > 1 ? ($plotWidth / (count($chartDates) - 1)) : 0;
+    $selectedIndex = array_search($selectedDateStr, $chartDates, true);
+    $selectedX = ($selectedIndex === false) ? null : ($left + ($stepX * $selectedIndex));
+    $quotaPath = buildResumenChartPath($quotaValues, $left, $top, $plotWidth, $plotHeight, $maxValue);
+    $salesPath = buildResumenChartPath($salesValues, $left, $top, $plotWidth, $plotHeight, $maxValue);
+    $yTopLabel = 'S/ ' . number_format($maxValue, 0, '.', ',');
+    $yMidLabel = 'S/ ' . number_format($maxValue / 2, 0, '.', ',');
+    $monthNames = [
+        1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
+        5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
+        9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'
+    ];
+    $monthLabel = ($monthNames[(int)$selectedDate->format('n')] ?? $selectedDate->format('F')) . ' ' . $selectedDate->format('Y');
+    $scopeLabel = $supervisor !== '' ? ('Supervisor ' . htmlspecialchars($supervisor, ENT_QUOTES, 'UTF-8')) : 'Todos los vendedores';
+
+    $html = '<div class="resumen-chart-card">';
+    $html .= '<div class="resumen-chart-head">';
+    $html .= '<div><h3>Ventas vs Cuota diaria</h3><p>' . htmlspecialchars($monthLabel, ENT_QUOTES, 'UTF-8') . ' · Corte ' . htmlspecialchars(date('d/m/Y', strtotime($selectedDateStr)), ENT_QUOTES, 'UTF-8') . ' · ' . $scopeLabel . '</p></div>';
+    $html .= '<div class="resumen-chart-legend"><span class="legend-item is-sales">Ventas</span><span class="legend-item is-quota">Cuota</span></div>';
+    $html .= '</div>';
+    $html .= '<svg class="resumen-chart-svg" viewBox="0 0 ' . $width . ' ' . $height . '" role="img" aria-label="Grafico mensual de ventas y cuota diaria">';
+    $html .= '<line x1="' . $left . '" y1="' . ($top + $plotHeight) . '" x2="' . ($left + $plotWidth) . '" y2="' . ($top + $plotHeight) . '" class="chart-axis" />';
+    $html .= '<line x1="' . $left . '" y1="' . $top . '" x2="' . $left . '" y2="' . ($top + $plotHeight) . '" class="chart-axis" />';
+    $html .= '<line x1="' . $left . '" y1="' . $top . '" x2="' . ($left + $plotWidth) . '" y2="' . $top . '" class="chart-grid" />';
+    $html .= '<line x1="' . $left . '" y1="' . ($top + ($plotHeight / 2)) . '" x2="' . ($left + $plotWidth) . '" y2="' . ($top + ($plotHeight / 2)) . '" class="chart-grid" />';
+    $html .= '<line x1="' . $left . '" y1="' . ($top + $plotHeight) . '" x2="' . ($left + $plotWidth) . '" y2="' . ($top + $plotHeight) . '" class="chart-grid" />';
+    if ($selectedX !== null) {
+        $html .= '<line x1="' . number_format($selectedX, 2, '.', '') . '" y1="' . $top . '" x2="' . number_format($selectedX, 2, '.', '') . '" y2="' . ($top + $plotHeight) . '" class="chart-focus" />';
+    }
+    $html .= '<text x="4" y="' . ($top + 4) . '" class="chart-y-label">' . htmlspecialchars($yTopLabel, ENT_QUOTES, 'UTF-8') . '</text>';
+    $html .= '<text x="4" y="' . ($top + ($plotHeight / 2) + 4) . '" class="chart-y-label">' . htmlspecialchars($yMidLabel, ENT_QUOTES, 'UTF-8') . '</text>';
+    $html .= '<text x="18" y="' . ($top + $plotHeight + 4) . '" class="chart-y-label">S/ 0</text>';
+    foreach ($chartDates as $index => $dayDate) {
+        $dayNumber = $days[$index];
+        $dayLabel = date('d/m/Y', strtotime($dayDate));
+        $daySale = $dailySalesByDay[$dayDate];
+        $dayQuota = $dailyQuotaByDay[$dayDate];
+        $dayPctRaw = ((float)$dayQuota > 0) ? ((((float)($daySale ?? 0.0)) / (float)$dayQuota) * 100) : 0;
+        $dayPct = ($dayPctRaw < 100) ? floor($dayPctRaw) : round($dayPctRaw);
+        $x = $left + ($stepX * $index);
+        $bandX = $index === 0 ? $left : $x - ($stepX / 2);
+        $bandWidth = count($chartDates) === 1 ? $plotWidth : ($index === count($chartDates) - 1 ? ($left + $plotWidth) - $bandX : $stepX);
+        $tooltip = $dayLabel
+            . ' · Venta: S/ ' . number_format((float)($daySale ?? 0.0), 2, '.', ',')
+            . ' · Cuota: S/ ' . number_format((float)$dayQuota, 2, '.', ',')
+            . ' · Avance: ' . $dayPct . '%';
+        $html .= '<rect x="' . number_format($bandX, 2, '.', '') . '" y="' . $top . '" width="' . number_format($bandWidth, 2, '.', '') . '" height="' . $plotHeight . '" class="chart-hover-band"><title>' . htmlspecialchars($tooltip, ENT_QUOTES, 'UTF-8') . '</title></rect>';
+    }
+    if ($quotaPath !== '') {
+        $html .= '<path d="' . htmlspecialchars($quotaPath, ENT_QUOTES, 'UTF-8') . '" class="chart-line chart-line-quota" />';
+    }
+    if ($salesPath !== '') {
+        $html .= '<path d="' . htmlspecialchars($salesPath, ENT_QUOTES, 'UTF-8') . '" class="chart-line chart-line-sales" />';
+    }
+    foreach ($chartDates as $index => $dayDate) {
+        $dayNumber = $days[$index];
+        $x = $left + ($stepX * $index);
+        $quotaValue = (float)$quotaValues[$index];
+        $quotaY = $top + $plotHeight - (($quotaValue / max($maxValue, 1)) * $plotHeight);
+        $salesValue = $salesValues[$index];
+        if ($salesValue !== null) {
+            $salesY = $top + $plotHeight - ((((float)$salesValue) / max($maxValue, 1)) * $plotHeight);
+            $html .= '<circle cx="' . number_format($x, 2, '.', '') . '" cy="' . number_format($salesY, 2, '.', '') . '" r="3.2" class="chart-point chart-point-sales" />';
+        }
+        $html .= '<circle cx="' . number_format($x, 2, '.', '') . '" cy="' . number_format($quotaY, 2, '.', '') . '" r="2.6" class="chart-point chart-point-quota" />';
+        $html .= '<circle cx="' . number_format($x, 2, '.', '') . '" cy="' . ($top + $plotHeight) . '" r="1.8" class="chart-tick" />';
+        $html .= '<text x="' . number_format($x, 2, '.', '') . '" y="' . ($top + $plotHeight + 20) . '" text-anchor="middle" class="chart-x-label">' . htmlspecialchars((string)$dayNumber, ENT_QUOTES, 'UTF-8') . '</text>';
+    }
+    $html .= '</svg>';
+    $html .= '<div class="resumen-chart-foot">';
+    $html .= '<span class="chart-metric"><small>Venta día</small><b>S/ ' . number_format($selectedSale, 2, '.', ',') . '</b></span>';
+    $html .= '<span class="chart-metric"><small>Cuota día</small><b>S/ ' . number_format($selectedQuota, 2, '.', ',') . '</b></span>';
+    $html .= '<span class="chart-metric"><small>Avance día</small><b>' . $selectedPct . '%</b></span>';
+    $html .= '</div>';
+    $html .= '</div>';
+
+    return $html;
+}
+
 function resumenProgressClass(float $avance): string {
     if ($avance < 40) return 'seg-progress-fill is-low';
     if ($avance < 70) return 'seg-progress-fill is-mid';
@@ -45,35 +305,7 @@ $stmt->bind_param('s', $fecha);
 $stmt->execute();
 $result = $stmt->get_result();
 
-// Obtener cuotas por día de semana (con histórico por semana)
-$dow = intval(date('N', strtotime($fecha))); // 1=Lunes ... 7=Domingo
-$cuotas = [];
-// 1) Intentar desde histórico: para cada vendedor, tomar la última cuota con vigente_desde <= $fecha
-$qh = $mysqli->prepare("SELECT Cod_Vendedor, Cuota, vigente_desde FROM cuotas_vendedor_hist WHERE Dia_Semana=? AND vigente_desde<=? ORDER BY Cod_Vendedor ASC, vigente_desde DESC");
-if ($qh) {
-    $qh->bind_param('is', $dow, $fecha);
-    $qh->execute();
-    $rh = $qh->get_result();
-    $seen = [];
-    while ($rowq = $rh->fetch_assoc()) {
-        $vd = (string)$rowq['Cod_Vendedor'];
-        if (!isset($seen[$vd])) { // primera (más reciente) por vendedor
-            $cuotas[$vd] = (float)$rowq['Cuota'];
-            $seen[$vd] = true;
-        }
-    }
-    $qh->close();
-}
-// 2) Completar faltantes desde tabla legacy si no hay histórico
-if (count($cuotas) === 0) {
-    $q = $mysqli->prepare("SELECT Cod_Vendedor, Cuota FROM cuotas_vendedor WHERE Dia_Semana=?");
-    if ($q) { $q->bind_param('i', $dow); $q->execute(); $r = $q->get_result();
-        while ($rowq = $r->fetch_assoc()) { $cuotas[$rowq['Cod_Vendedor']] = (float)$rowq['Cuota']; }
-        $q->close();
-    }
-}
-
-
+$cuotas = loadCuotasForDate($mysqli, $fecha);
 if ($result->num_rows > 0) {
     $total_pedidos = 0;
     $total_monto = 0;
@@ -81,28 +313,13 @@ if ($result->num_rows > 0) {
     $total_faltante = 0.0;
     $rows = [];
     while ($row = $result->fetch_assoc()) {
-        // Normalizar código de vendedor y buscar supervisor por varias formas
         $vdRaw = trim((string)$row['Cod_Vendedor']);
-        $vdNoZeros = ltrim($vdRaw, '0');
-        if ($vdNoZeros === '') { $vdNoZeros = '0'; }
-        $vdPadded3 = str_pad($vdNoZeros, 3, '0', STR_PAD_LEFT);
+        [, $vdNoZeros, $vdPadded3] = vendorCodeVariants($vdRaw);
 
-        $sup = '';
-        if (isset($vd_supervisor[$vdRaw])) {
-            $sup = $vd_supervisor[$vdRaw];
-        } elseif (isset($vd_supervisor[$vdNoZeros])) {
-            $sup = $vd_supervisor[$vdNoZeros];
-        } elseif (isset($vd_supervisor[$vdPadded3])) {
-            $sup = $vd_supervisor[$vdPadded3];
-        }
+        $sup = resolveSupervisorForVendor($vdRaw, $vd_supervisor);
         $row['Supervisor'] = $sup;
-        // Filtrar por supervisor si se seleccionó
         if ($supervisor && $row['Supervisor'] !== $supervisor) continue;
-        // Calcular cuota del vendedor para el día
-        $cuotaVal = 0.0;
-        if (isset($cuotas[$vdRaw])) $cuotaVal = (float)$cuotas[$vdRaw];
-        elseif (isset($cuotas[$vdNoZeros])) $cuotaVal = (float)$cuotas[$vdNoZeros];
-        elseif (isset($cuotas[$vdPadded3])) $cuotaVal = (float)$cuotas[$vdPadded3];
+        $cuotaVal = resolveVendorQuota($cuotas, $vdRaw);
         $row['CuotaVal'] = $cuotaVal;
 
         $total_pedidos += intval($row['ctd_pedidos']);

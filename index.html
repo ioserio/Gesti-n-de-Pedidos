@@ -197,7 +197,7 @@
         <hr style="margin:24px 0;">
 
         <h2>Subir Excel de Cubo de Ventas</h2>
-        <p>Selecciona tu archivo <b>CUBO DE VENTAS - RESUMEN.xlsx</b> para cargarlo en la tabla <code>cubo_de_ventas_resumen</code>.</p>
+        <p>Selecciona tu archivo <b>CUBO DE VENTAS - RESUMEN.xlsx</b> para cargarlo en la tabla <code>cubo_de_ventas_resumen</code>. El sistema detecta la fecha de los documentos del archivo y reemplaza los registros existentes de esas mismas fechas.</p>
         <form action="procesar_cubo_ventas.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
             <input type="file" name="archivo_cubo_ventas" accept=".xlsx,.xls" required>
             <label style="margin-left:14px; display:inline-flex; align-items:center; gap:6px;">
@@ -206,6 +206,7 @@
             </label>
             <button type="submit" style="margin-left:14px;">Subir Cubo de Ventas</button>
         </form>
+        <p style="font-size:12px; color:#666; margin-top:8px;">Si no marcas la casilla, solo se borran los registros de las fechas encontradas en el archivo que estás subiendo.</p>
     </section>
     <section id="modulo-consultar" style="display:none;">
         <h2>Consultar Pedidos por Vendedor</h2>
@@ -237,6 +238,10 @@
             <label id="resumen-adm-wrap" style="display:none; align-items:center; gap:6px;">
                 <input type="checkbox" id="resumen_adm_chk">
                 ADM
+            </label>
+            <label id="resumen-chart-wrap" style="display:inline-flex; align-items:center; gap:6px;">
+                <input type="checkbox" id="resumen_chart_chk" checked>
+                Grafico
             </label>
             <button type="submit">Consultar</button>
             <span id="ultima_actualizacion" style="margin-left:auto; color:#555; font-weight:600; white-space:nowrap;"></span>

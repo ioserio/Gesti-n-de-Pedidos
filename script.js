@@ -740,6 +740,10 @@ function initImportFormsAjax(){
             .then(txt => { lbl.textContent = txt; })
             .catch(() => { lbl.textContent = 'Ultima actualizacion: -'; });
     }
+function isResumenChartChecked() {
+    const chk = document.getElementById('resumen_chart_chk');
+    return !!(chk && chk.checked);
+}
 function cargarResumen(fecha) {
     const resumen = document.getElementById('resumen');
     const supervisor = document.getElementById('supervisor_resumen') ? document.getElementById('supervisor_resumen').value : '';
@@ -767,6 +771,7 @@ function cargarResumen(fecha) {
 function cargarResumenHistorico(fecha) {
     const cont = document.getElementById('resumen-historico');
     const supervisor = document.getElementById('supervisor_resumen') ? document.getElementById('supervisor_resumen').value : '';
+    const showMonthChart = isResumenChartChecked();
     if (!cont) return;
     cont.innerHTML = '<p>Cargando histórico...</p>';
 
@@ -774,15 +779,75 @@ function cargarResumenHistorico(fecha) {
     if (supervisor) {
         url += '&supervisor=' + encodeURIComponent(supervisor);
     }
+    if (showMonthChart) {
+        url += '&show_month_chart=1';
+    }
 
     fetch(url)
         .then(res => res.text())
         .then(html => {
             cont.innerHTML = html;
+            initResumenChartTooltips(cont);
         })
         .catch(() => {
             cont.innerHTML = '<p>Error al consultar histórico.</p>';
         });
+}
+
+function initResumenChartTooltips(root) {
+    const scope = root || document;
+    const cards = scope.querySelectorAll('.historico-chart-side');
+    cards.forEach(function(card) {
+        if (card.__tooltipWired) return;
+        const summary = card.querySelector('.chart-hover-summary');
+        const bands = card.querySelectorAll('.chart-hover-band');
+        if (!summary || !bands.length) return;
+
+        function renderSummary(date, sale, quota, avance, faltante) {
+            summary.innerHTML = ''
+                + '<div class="chart-tooltip-date">' + date + '</div>'
+                + '<div class="chart-tooltip-grid">'
+                + '<div class="chart-tooltip-item"><span class="chart-tooltip-label">Venta</span><strong class="chart-tooltip-value">S/ ' + sale + '</strong></div>'
+                + '<div class="chart-tooltip-item"><span class="chart-tooltip-label">Cuota</span><strong class="chart-tooltip-value">S/ ' + quota + '</strong></div>'
+                + '<div class="chart-tooltip-item"><span class="chart-tooltip-label">Avance</span><strong class="chart-tooltip-value">' + avance + '</strong></div>'
+                + '<div class="chart-tooltip-item"><span class="chart-tooltip-label">Faltante</span><strong class="chart-tooltip-value">S/ ' + faltante + '</strong></div>'
+                + '</div>';
+        }
+
+        function hideTooltip() {
+            renderSummary(
+                summary.getAttribute('data-default-date') || '',
+                summary.getAttribute('data-default-sale') || '0.00',
+                summary.getAttribute('data-default-quota') || '0.00',
+                summary.getAttribute('data-default-avance') || '0%',
+                summary.getAttribute('data-default-faltante') || '0.00'
+            );
+        }
+
+        function updateTooltip(band) {
+            const date = band.getAttribute('data-date') || '';
+            const sale = band.getAttribute('data-sale') || '0.00';
+            const quota = band.getAttribute('data-quota') || '0.00';
+            const avance = band.getAttribute('data-avance') || '0%';
+            const faltante = band.getAttribute('data-faltante') || '0.00';
+            renderSummary(date, sale, quota, avance, faltante);
+        }
+
+        hideTooltip();
+
+        bands.forEach(function(band) {
+            band.addEventListener('mouseenter', function() {
+                updateTooltip(band);
+            });
+            band.addEventListener('mousemove', function() {
+                updateTooltip(band);
+            });
+            band.addEventListener('mouseleave', hideTooltip);
+        });
+
+        card.addEventListener('mouseleave', hideTooltip);
+        card.__tooltipWired = true;
+    });
 }
 
 function canUseDashboardAdm() {
@@ -929,6 +994,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const admChk = document.getElementById('resumen_adm_chk');
         if (admChk) {
             admChk.addEventListener('change', function(){
+                const fecha = document.getElementById('fecha_resumen').value;
+                refreshResumenDashboard(fecha);
+            });
+        }
+        const chartChk = document.getElementById('resumen_chart_chk');
+        if (chartChk) {
+            chartChk.addEventListener('change', function(){
                 const fecha = document.getElementById('fecha_resumen').value;
                 refreshResumenDashboard(fecha);
             });
