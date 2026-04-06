@@ -23,6 +23,7 @@ $MODULES = [
     'usuarios'        => 'Usuarios',
     'permisos'        => 'Permisos',
     'almacen'         => 'Almacén',
+    'horarios'        => 'Config. Horarios',
 ];
 
 $action = $_GET['action'] ?? ($_POST['action'] ?? 'list');

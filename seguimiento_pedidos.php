@@ -141,6 +141,14 @@ uksort($vendedores, function($a,$b){ return intval($a) <=> intval($b); });
 
 $cuotas = cuotasPorFecha($mysqli, $fecha);
 
+// Obtener hora de ingreso configurada para este día
+$dow = intval(date('N', strtotime($fecha)));
+$horaIngresoLimite = '07:30:00'; // Fallback
+$resH = $mysqli->query("SELECT hora_ingreso FROM config_horarios_ingreso WHERE dia_semana = $dow");
+if ($resH && $rh = $resH->fetch_assoc()) {
+    $horaIngresoLimite = $rh['hora_ingreso'];
+}
+
 // Traer todos los pedidos del día con Hora y vendedor
 $pedidos = [];
 $ventas = [];
@@ -176,11 +184,33 @@ foreach ($vendedores as $cod => $info) {
         }
     }
     // Últimas dos horas generales (desc)
-    $last1 = null; $last2 = null;
+    $f1 = null; $f2 = null; $last1 = null; $last2 = null;
     $cuota = cuotaDeVendedor($cod, $cuotas);
     $venta = isset($ventas[$cod]) ? (float)$ventas[$cod] : 0.0;
     $avance = $cuota > 0 ? (($venta / $cuota) * 100) : 0.0;
     if (count($times)) {
+        // Para 1er y 2do pedido (Ascendente)
+        sort($times);
+        $f1Full = $times[0];
+        $f1 = substr($f1Full, 0, 5);
+        $diffStr = '';
+        $diffStyle = '';
+        if (isset($times[1])) {
+            $f2Full = $times[1];
+            $f2 = substr($f2Full, 0, 5);
+            
+            $t1 = strtotime($f1Full);
+            $t2 = strtotime($f2Full);
+            $diffSecs = max(0, $t2 - $t1);
+            $h = floor($diffSecs / 3600);
+            $m = floor(($diffSecs % 3600) / 60);
+            $diffStr = sprintf('%02d:%02d', $h, $m);
+            
+            if ($f1Full > $horaIngresoLimite) $diffStyle = 'color: #ef4444; font-weight: 700;'; // Rojo > Configuración
+            if ($diffSecs > 1800) $diffStyle = 'color: #3b82f6; font-weight: 700;';     // Azul > 30 min (prioridad)
+        }
+
+        // Para penúltimo y último (Descendente)
         rsort($times); // Orden descendente lexicográfico funciona para HH:MM:SS
         $last1 = substr($times[0],0,5);
         if (isset($times[1])) $last2 = substr($times[1],0,5);
@@ -192,6 +222,10 @@ foreach ($vendedores as $cod => $info) {
         'r2' => $counts[2],
         'r3' => $counts[3],
         'r4' => $counts[4],
+        'f1' => $f1,
+        'f2' => $f2,
+        'diff' => $diffStr,
+        'diffStyle' => $diffStyle,
         'l1' => $last1,
         'l2' => $last2
     ];
@@ -237,16 +271,26 @@ $sortTitle = ($sortLast === 'asc') ? 'Ordenado de menor a mayor' : (($sortLast =
 
 // Render de la tabla de seguimiento (desktop)
 echo '<table class="seg-desktop">';
-echo '<tr><th colspan="8" style="text-align:left; background:#e6f2ff; font-size:17px;">Seguimiento del ' . htmlspecialchars($fecha) . ($supervisor ? ' — Supervisor: ' . htmlspecialchars($supervisor) : '') . ' <button onclick="window.print()" style="float:right; background:#007bff; color:#fff; border:none; padding:6px 16px; border-radius:4px; cursor:pointer; font-size:15px;">Imprimir PDF</button></th></tr>';
+echo '<tr><th colspan="11" style="text-align:left; background:#e6f2ff; font-size:17px;">Seguimiento del ' . htmlspecialchars($fecha) . ($supervisor ? ' — Supervisor: ' . htmlspecialchars($supervisor) : '') . ' <button onclick="window.print()" style="float:right; background:#007bff; color:#fff; border:none; padding:6px 16px; border-radius:4px; cursor:pointer; font-size:15px;">Imprimir PDF</button></th></tr>';
+
+// Fila 1 de encabezados: Agrupación INGRESO
 echo '<tr>';
-echo '<th style="text-align:center;">Vendedor</th>';
-echo '<th style="text-align:center; min-width:170px;">Avance cuota</th>';
-echo '<th style="text-align:center;">RANGO 1<br><small>7 - 9</small></th>';
-echo '<th style="text-align:center;">RANGO 2<br><small>10 - 12</small></th>';
-echo '<th style="text-align:center;">RANGO 3<br><small>13 - 15</small></th>';
-echo '<th style="text-align:center;">RANGO 4<br><small>16 - 18</small></th>';
-echo '<th style="text-align:center;"><button type="button" class="seg-sort-btn' . ($sortPrev !== '' ? ' is-active' : '') . '" data-sort-prev="' . htmlspecialchars($nextSortPrev, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortPrevTitle, ENT_QUOTES, 'UTF-8') . '">Penultimo pedido <span class="seg-sort-icon">' . htmlspecialchars($sortPrevArrow, ENT_QUOTES, 'UTF-8') . '</span></button></th>';
-echo '<th style="text-align:center;"><button type="button" class="seg-sort-btn' . ($sortLast !== '' ? ' is-active' : '') . '" data-sort-last="' . htmlspecialchars($nextSortLast, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortTitle, ENT_QUOTES, 'UTF-8') . '">Ultimo pedido <span class="seg-sort-icon">' . htmlspecialchars($sortArrow, ENT_QUOTES, 'UTF-8') . '</span></button></th>';
+echo '<th rowspan="2" style="text-align:center;">Vendedor</th>';
+echo '<th rowspan="2" style="text-align:center; min-width:170px;">Avance cuota</th>';
+echo '<th rowspan="2" style="text-align:center;">RANGO 1<br><small>7 - 9</small></th>';
+echo '<th rowspan="2" style="text-align:center;">RANGO 2<br><small>10 - 12</small></th>';
+echo '<th rowspan="2" style="text-align:center;">RANGO 3<br><small>13 - 15</small></th>';
+echo '<th rowspan="2" style="text-align:center;">RANGO 4<br><small>16 - 18</small></th>';
+echo '<th colspan="3" style="text-align:center; background:#f8fafc; color:#1e293b; font-weight:800; border-bottom: 2px solid #cbd5e1;">INGRESO</th>';
+echo '<th rowspan="2" style="text-align:center;"><button type="button" class="seg-sort-btn' . ($sortPrev !== '' ? ' is-active' : '') . '" data-sort-prev="' . htmlspecialchars($nextSortPrev, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortPrevTitle, ENT_QUOTES, 'UTF-8') . '">Penultimo pedido <span class="seg-sort-icon">' . htmlspecialchars($sortPrevArrow, ENT_QUOTES, 'UTF-8') . '</span></button></th>';
+echo '<th rowspan="2" style="text-align:center;"><button type="button" class="seg-sort-btn' . ($sortLast !== '' ? ' is-active' : '') . '" data-sort-last="' . htmlspecialchars($nextSortLast, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortTitle, ENT_QUOTES, 'UTF-8') . '">Ultimo pedido <span class="seg-sort-icon">' . htmlspecialchars($sortArrow, ENT_QUOTES, 'UTF-8') . '</span></button></th>';
+echo '</tr>';
+
+// Fila 2: Sub-cabeceras de INGRESO
+echo '<tr>';
+echo '<th style="text-align:center;">1er pedido</th>';
+echo '<th style="text-align:center;">2do pedido</th>';
+echo '<th style="text-align:center;">Diferencia</th>';
 echo '</tr>';
 foreach ($filas as $f) {
     echo '<tr>';
@@ -257,6 +301,9 @@ foreach ($filas as $f) {
     echo '<td style="text-align:center;">' . intval($f['r2']) . '</td>';
     echo '<td style="text-align:center;">' . intval($f['r3']) . '</td>';
     echo '<td style="text-align:center;">' . intval($f['r4']) . '</td>';
+    echo '<td style="text-align:center;">' . ($f['f1'] ? htmlspecialchars($f['f1']) : '—') . '</td>';
+    echo '<td style="text-align:center;">' . ($f['f2'] ? htmlspecialchars($f['f2']) : '—') . '</td>';
+    echo '<td style="text-align:center; ' . $f['diffStyle'] . '">' . ($f['diff'] ? htmlspecialchars($f['diff']) : '—') . '</td>';
     echo '<td style="text-align:center;">' . ($f['l2'] ? htmlspecialchars($f['l2']) : '—') . '</td>';
     echo '<td style="text-align:center;">' . ($f['l1'] ? htmlspecialchars($f['l1']) : '—') . '</td>';
     echo '</tr>';
@@ -278,6 +325,11 @@ foreach ($filas as $f) {
             . '<span class="seg-badge r2">R2 (' . htmlspecialchars($rLabels[2]) . '): ' . intval($f['r2']) . '</span>'
             . '<span class="seg-badge r3">R3 (' . htmlspecialchars($rLabels[3]) . '): ' . intval($f['r3']) . '</span>'
             . '<span class="seg-badge r4">R4 (' . htmlspecialchars($rLabels[4]) . '): ' . intval($f['r4']) . '</span>'
+        . '</div>';
+    echo   '<div class="seg-last" style="margin-bottom:6px;">'
+            . '<span>1er Ped: <span class="seg-time">' . ($f['f1'] ? htmlspecialchars($f['f1']) : '—') . '</span></span>'
+            . '<span>2do Ped: <span class="seg-time">' . ($f['f2'] ? htmlspecialchars($f['f2']) : '—') . '</span></span>'
+            . '<span>Gap: <span style="' . $f['diffStyle'] . '">' . ($f['diff'] ? htmlspecialchars($f['diff']) : '—') . '</span></span>'
         . '</div>';
     echo   '<div class="seg-last">'
             . '<span>Penúltimo: <span class="seg-time">' . ($f['l2'] ? htmlspecialchars($f['l2']) : '—') . '</span></span>'

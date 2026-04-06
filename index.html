@@ -99,6 +99,7 @@
                     </a>
                     <ul class="submenu">
                         <li><a href="#" data-mod="admin" onclick="mostrarModulo('admin')">Administrador de Cuotas (Legacy)</a></li>
+                        <li><a href="#" data-mod="horarios" onclick="mostrarModulo('horarios')">Horarios de Ingreso</a></li>
                         <li><a href="cuotas_gestion.php" data-mod="cuotas_hist">Cuotas Semanales / Histórico</a></li>
                         <li><a href="#" data-mod="cuota_mensual" onclick="mostrarModulo('cuota_mensual')">Cuota/Mensual</a></li>
                         <li><a href="#" data-mod="rutas" onclick="mostrarModulo('rutas')">Rutas</a></li>
@@ -335,6 +336,13 @@
         </div>
         <div id="lista-cuotas"></div>
     </section>
+    <section id="modulo-horarios" style="display:none;">
+        <h2>Configuración de Horarios de Ingreso</h2>
+        <p style="font-size:13px; color:#666; margin-bottom:15px;">Define la hora límite para el primer pedido por cada día de la semana. Los pedidos posteriores a esta hora se marcarán en rojo en el seguimiento.</p>
+        <div id="contenedor-horarios" class="resumen-table-wrap">
+            <p>Cargando horarios...</p>
+        </div>
+    </section>
     <section id="modulo-cuota-mensual" style="display:none;">
         <h2>Cuota/Mensual</h2>
         <p style="margin-bottom:10px;color:#555;">Registra la cuota global del mes (sin vendedor).</p>
@@ -443,6 +451,11 @@
     <section id="modulo-sesiones" style="display:none;">
         <h2>Usuarios en línea</h2>
         <div id="lista-sesiones"></div>
+    </section>
+    <section id="modulo-reportes" style="display:none;">
+        <h2>Reportes Gerenciales</h2>
+        <p>Análisis consolidado de la operación.</p>
+        <div id="contenedor-reportes" class="resumen-table-wrap"></div>
     </section>
     <section id="modulo-permisos" style="display:none;">
         <h2>Permisos</h2>

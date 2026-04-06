@@ -146,6 +146,7 @@ const MODULE_PERMISSION_MAP = {
     'ctacte_vendedor':'ctacte_vendedor',
     'usuarios':'usuarios',
     'permisos':'permisos',
+    'horarios':'horarios',
     'sesiones':'usuarios',
     'almacen':'almacen',
     'inicio': null
@@ -168,7 +169,8 @@ const MODULE_TAB_META = {
     'usuarios': { title: 'Usuarios', closable: true },
     'permisos': { title: 'Permisos', closable: true },
     'sesiones': { title: 'Usuarios en línea', closable: true },
-    'almacen': { title: 'Almacén', closable: true }
+    'almacen': { title: 'Almacén', closable: true },
+    'horarios': { title: 'Horarios de Ingreso', closable: true }
 };
 
 window.__openModuleTabs = window.__openModuleTabs || ['inicio'];
@@ -357,7 +359,8 @@ function getModuleSection(modulo) {
         usuarios: 'modulo-usuarios',
         permisos: 'modulo-permisos',
         sesiones: 'modulo-sesiones',
-        almacen: 'modulo-almacen'
+        almacen: 'modulo-almacen',
+        horarios: 'modulo-horarios'
     };
     const sectionId = sectionIdMap[modulo];
     return sectionId ? document.getElementById(sectionId) : null;
@@ -440,6 +443,8 @@ function activateModuleContent(modulo) {
         if (sesiones) sesiones.style.display = (modulo === 'sesiones') ? 'block' : 'none';
         const almacen = document.getElementById('modulo-almacen');
         if (almacen) almacen.style.display = (modulo === 'almacen') ? 'block' : 'none';
+        const horarios = document.getElementById('modulo-horarios');
+        if (horarios) horarios.style.display = (modulo === 'horarios') ? 'block' : 'none';
         // Detener auto-refresh de sesiones al salir del módulo
         if (modulo !== 'sesiones' && window.__SESSIONS_TIMER) {
             clearInterval(window.__SESSIONS_TIMER);
@@ -482,6 +487,8 @@ function activateModuleContent(modulo) {
             if (addBtn && !addBtn.__wired) { addBtn.__wired = true; addBtn.addEventListener('click', buildMassTemplateLegacy); }
             if (saveBtn && !saveBtn.__wired) { saveBtn.__wired = true; saveBtn.addEventListener('click', saveMassLegacy); }
         }, 50);
+        } else if (modulo === 'horarios') {
+            setTimeout(function(){ cargarHorariosConfig(); }, 50);
         } else if (modulo === 'cuota_mensual') {
             setTimeout(function(){ initCuotaMensualModule(); cargarCuotaMensual(); }, 50);
         } else if (modulo === 'devoluciones') {
@@ -1105,6 +1112,47 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+function cargarHorariosConfig() {
+    const cont = document.getElementById('contenedor-horarios');
+    if (!cont) return;
+    fetch('config_horarios_api.php?action=list')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) return;
+            const dias = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+            let html = '<table><thead><tr><th>Día</th><th>Hora de Ingreso</th><th>Acción</th></tr></thead><tbody>';
+            data.horarios.forEach(h => {
+                html += `<tr>
+                    <td><b>${dias[h.dia_semana]}</b></td>
+                    <td><input type="time" id="h_ingreso_${h.dia_semana}" value="${h.hora_ingreso.substring(0, 5)}" class="form-control"></td>
+                    <td><button onclick="guardarHorario(${h.dia_semana})" style="padding:5px 10px; font-size:12px;">Actualizar</button></td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            cont.innerHTML = html;
+        });
+}
+
+function guardarHorario(dia) {
+    const hora = document.getElementById(`h_ingreso_${dia}`).value;
+    if (!hora) return;
+
+    const fd = new FormData();
+    fd.append('action', 'save');
+    fd.append('dia_semana', dia);
+    fd.append('hora_ingreso', hora);
+
+    fetch('config_horarios_api.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                alert('Horario actualizado correctamente');
+            } else {
+                alert('Error al guardar');
+            }
+        });
+}
 
 // Almacén: inicialización y carga
 function setFechaHoyAlmacen(){
