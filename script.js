@@ -143,6 +143,7 @@ const MODULE_PERMISSION_MAP = {
     'cuota_mensual':'cuota_mensual',
     'cuotas_hist':'cuotas_hist',
     'rutas':'rutas',
+    'vendedores':'vendedores',
     'ctacte_vendedor':'ctacte_vendedor',
     'usuarios':'usuarios',
     'permisos':'permisos',
@@ -165,6 +166,7 @@ const MODULE_TAB_META = {
     'admin': { title: 'Admin Cuotas', closable: true },
     'cuota_mensual': { title: 'Cuota Mensual', closable: true },
     'rutas': { title: 'Rutas', closable: true },
+    'vendedores': { title: 'Vendedores', closable: true },
     'ctacte_vendedor': { title: 'CTACTE/Vendedor', closable: true },
     'usuarios': { title: 'Usuarios', closable: true },
     'permisos': { title: 'Permisos', closable: true },
@@ -355,6 +357,7 @@ function getModuleSection(modulo) {
         admin: 'modulo-admin',
         cuota_mensual: 'modulo-cuota-mensual',
         rutas: 'modulo-rutas',
+        vendedores: 'modulo-vendedores',
         ctacte_vendedor: 'modulo-ctacte-vendedor',
         usuarios: 'modulo-usuarios',
         permisos: 'modulo-permisos',
@@ -433,6 +436,8 @@ function activateModuleContent(modulo) {
         if (herramientas) herramientas.style.display = (modulo === 'herramientas') ? 'block' : 'none';
         const rutas = document.getElementById('modulo-rutas');
         if (rutas) rutas.style.display = (modulo === 'rutas') ? 'block' : 'none';
+        const vendedores = document.getElementById('modulo-vendedores');
+        if (vendedores) vendedores.style.display = (modulo === 'vendedores') ? 'block' : 'none';
         const vsmod = document.getElementById('modulo-ctacte-vendedor');
         if (vsmod) vsmod.style.display = (modulo === 'ctacte_vendedor') ? 'block' : 'none';
         const usuarios = document.getElementById('modulo-usuarios');
@@ -514,6 +519,8 @@ function activateModuleContent(modulo) {
             }, 50);
         } else if (modulo === 'rutas') {
             setTimeout(function(){ cargarRutas(); }, 50);
+        } else if (modulo === 'vendedores') {
+            setTimeout(function(){ cargarVendedoresAdmin(); }, 50);
         } else if (modulo === 'ctacte_vendedor') {
             setTimeout(function(){ cargarVS(); }, 50);
         } else if (modulo === 'permisos') {
@@ -2664,8 +2671,73 @@ function cargarUsuarios(){
         .catch(err => { cont.innerHTML = '<p>Error al cargar usuarios: ' + (err.message||'') + '</p>'; });
 }
 
+function cargarVendedoresAdmin(){
+    const cont = document.getElementById('lista-vendedores');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando vendedores...</p>';
+    fetch('vendedores_admin_api.php?action=list')
+        .then(r => {
+            if (!r.ok) return r.text().then(t => { throw new Error(t || ('HTTP ' + r.status)); });
+            return r.text();
+        })
+        .then(html => { cont.innerHTML = html; })
+        .catch(err => { cont.innerHTML = '<p>Error al cargar vendedores: ' + (err.message || '') + '</p>'; });
+}
+
+function cargarOpcionesSupervisorVendedor(){
+    const select = document.getElementById('v_supervisor');
+    const wrap = document.getElementById('v_supervisor_wrap');
+    if (!select || !wrap) return;
+    fetch('vendedores_admin_api.php?action=supervisor_options')
+        .then(r => r.json())
+        .then(data => {
+            const enabled = !!(data && data.enabled);
+            const options = (data && Array.isArray(data.options)) ? data.options : [];
+            select.innerHTML = '<option value="">-- Sin supervisor --</option>';
+            options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = String(opt.id ?? '');
+                option.textContent = String(opt.label ?? opt.id ?? '');
+                select.appendChild(option);
+            });
+            wrap.style.display = enabled ? '' : 'none';
+            select.disabled = !enabled || !options.length;
+        })
+        .catch(() => {
+            wrap.style.display = 'none';
+            select.disabled = true;
+        });
+}
+
+function cargarOpcionesSupervisorUsuario(){
+    const select = document.getElementById('u_supervisor');
+    const wrap = document.getElementById('u_supervisor_wrap');
+    if (!select || !wrap) return;
+    fetch('users_api.php?action=supervisor_options')
+        .then(r => r.json())
+        .then(data => {
+            const enabled = !!(data && data.enabled);
+            const options = (data && Array.isArray(data.options)) ? data.options : [];
+            select.innerHTML = '<option value="">-- Sin supervisor --</option>';
+            options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = String(opt.value ?? '');
+                option.textContent = String(opt.label ?? opt.value ?? '');
+                select.appendChild(option);
+            });
+            wrap.style.display = enabled ? '' : 'none';
+            select.disabled = !enabled || !options.length;
+        })
+        .catch(() => {
+            wrap.style.display = 'none';
+            select.disabled = true;
+        });
+}
+
 document.addEventListener('DOMContentLoaded', function(){
     const formNew = document.getElementById('form-usuario-new');
+    cargarOpcionesSupervisorUsuario();
+    cargarOpcionesSupervisorVendedor();
     if (formNew) {
         formNew.addEventListener('submit', function(e){
             e.preventDefault();
@@ -2690,6 +2762,27 @@ document.addEventListener('DOMContentLoaded', function(){
                 });
         });
     }
+    const formVend = document.getElementById('form-vendedor-new');
+    if (formVend) {
+        formVend.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const fd = new FormData(formVend);
+            fd.append('action', 'create');
+            fetch('vendedores_admin_api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => {
+                    if (!res || res.ok !== true) throw new Error(res && res.error ? res.error : 'Error');
+                    formVend.reset();
+                    cargarVendedoresAdmin();
+                })
+                .catch(err => {
+                    let msg = 'No se pudo crear el vendedor';
+                    if (err && err.message === 'DUPLICATE') msg = 'El código de vendedor ya existe';
+                    if (err && err.message === 'REQUIRED') msg = 'Complete código y nombre';
+                    alert(msg);
+                });
+        });
+    }
     // Delegación de acciones en listado
     const lista = document.getElementById('lista-usuarios');
     if (lista) {
@@ -2701,9 +2794,10 @@ document.addEventListener('DOMContentLoaded', function(){
                 const usuario = tr.querySelector('.u-usuario')?.value.trim() || '';
                 const nombre = tr.querySelector('.u-nombre')?.value.trim() || '';
                 const rol = tr.querySelector('.u-rol')?.value || 'USER';
+                const supervisorId = tr.querySelector('.u-supervisor')?.value || '';
                 const activo = tr.querySelector('.u-activo')?.checked ? '1' : '0';
                 const fd = new FormData();
-                fd.append('action','update'); fd.append('id', String(id)); fd.append('usuario', usuario); fd.append('nombre', nombre); fd.append('rol', rol); fd.append('activo', activo);
+                fd.append('action','update'); fd.append('id', String(id)); fd.append('usuario', usuario); fd.append('nombre', nombre); fd.append('rol', rol); fd.append('activo', activo); fd.append('supervisor_id', supervisorId);
                 fetch('users_api.php', { method:'POST', body: fd })
                     .then(r => r.json())
                     .then(res => {
@@ -2729,6 +2823,57 @@ document.addEventListener('DOMContentLoaded', function(){
                         alert('Contraseña actualizada');
                     })
                     .catch(()=>alert('No se pudo actualizar la contraseña'));
+            }
+        });
+    }
+    const listaVendedores = document.getElementById('lista-vendedores');
+    if (listaVendedores) {
+        listaVendedores.addEventListener('click', function(e) {
+            const tr = e.target.closest('tr[data-codigo]');
+            if (!tr) return;
+            const codigoOriginal = tr.getAttribute('data-codigo') || '';
+            if (e.target.closest('.vendor-save')) {
+                const codigo = tr.querySelector('.v-codigo')?.value.trim() || '';
+                const nombre = tr.querySelector('.v-nombre')?.value.trim() || '';
+                const idSupervisor = tr.querySelector('.v-supervisor')?.value || '';
+                const fd = new FormData();
+                fd.append('action', 'update');
+                fd.append('codigo_original', codigoOriginal);
+                fd.append('codigo', codigo);
+                fd.append('nombre', nombre);
+                fd.append('id_supervisor', idSupervisor);
+                fetch('vendedores_admin_api.php', { method: 'POST', body: fd })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (!res || res.ok !== true) throw new Error(res && res.error ? res.error : 'Error');
+                        tr.setAttribute('data-codigo', res.codigo || codigoOriginal);
+                        const ok = document.createElement('span');
+                        ok.textContent = ' Guardado';
+                        ok.style.color = '#198754';
+                        ok.style.marginLeft = '6px';
+                        ok.style.fontSize = '12px';
+                        e.target.insertAdjacentElement('afterend', ok);
+                        setTimeout(() => ok.remove(), 1200);
+                    })
+                    .catch(err => {
+                        let msg = 'No se pudo guardar el vendedor';
+                        if (err && err.message === 'DUPLICATE') msg = 'El código de vendedor ya existe';
+                        if (err && err.message === 'PARAMS') msg = 'Complete código y nombre válidos';
+                        alert(msg);
+                    });
+            }
+            if (e.target.closest('.vendor-delete')) {
+                if (!confirm('¿Eliminar este vendedor?')) return;
+                const fd = new FormData();
+                fd.append('action', 'delete');
+                fd.append('codigo', codigoOriginal);
+                fetch('vendedores_admin_api.php', { method: 'POST', body: fd })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (!res || res.ok !== true) throw new Error('Error');
+                        tr.remove();
+                    })
+                    .catch(() => alert('No se pudo eliminar el vendedor'));
             }
         });
     }

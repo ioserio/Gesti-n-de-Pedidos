@@ -103,6 +103,7 @@
                         <li><a href="cuotas_gestion.php" data-mod="cuotas_hist">Cuotas Semanales / Histórico</a></li>
                         <li><a href="#" data-mod="cuota_mensual" onclick="mostrarModulo('cuota_mensual')">Cuota/Mensual</a></li>
                         <li><a href="#" data-mod="rutas" onclick="mostrarModulo('rutas')">Rutas</a></li>
+                        <li><a href="#" data-mod="vendedores" onclick="mostrarModulo('vendedores')">Vendedores</a></li>
                         <li><a href="#" data-mod="ctacte_vendedor" onclick="mostrarModulo('ctacte_vendedor')">CTACTE/Vendedor</a></li>
                         <li><a href="#" data-mod="usuarios" onclick="mostrarModulo('usuarios')">Usuarios</a></li>
                         <li><a href="#" data-mod="permisos" onclick="mostrarModulo('permisos')">Permisos</a></li>
@@ -427,6 +428,20 @@
         </form>
         <div id="lista-rutas"></div>
     </section>
+    <section id="modulo-vendedores" style="display:none;">
+        <h2>Vendedores</h2>
+        <form id="form-vendedor-new" style="margin-bottom:12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <label>Código: <input type="text" id="v_codigo" name="codigo" required maxlength="3" style="width:90px;"></label>
+            <label>Nombre: <input type="text" id="v_nombre" name="nombre" required style="min-width:260px;"></label>
+            <label id="v_supervisor_wrap" style="display:none;">Supervisor:
+                <select id="v_supervisor" name="id_supervisor" style="min-width:190px;">
+                    <option value="">-- Sin supervisor --</option>
+                </select>
+            </label>
+            <button type="submit">Crear vendedor</button>
+        </form>
+        <div id="lista-vendedores"></div>
+    </section>
     <section id="modulo-usuarios" style="display:none;">
         <h2>Usuarios</h2>
         <form id="form-usuario-new" style="margin-bottom:12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
@@ -440,6 +455,11 @@
                     <option value="CUENTACORRIENTE">CUENTACORRIENTE</option>
                     <option value="SUPERVISOR">SUPERVISOR</option>
                     <option value="FACTURADOR">FACTURADOR</option>
+                </select>
+            </label>
+            <label id="u_supervisor_wrap" style="display:none;">Supervisor:
+                <select id="u_supervisor" name="supervisor_id" style="min-width:190px;">
+                    <option value="">-- Sin supervisor --</option>
                 </select>
             </label>
             <label>Activo: <input type="checkbox" id="u_activo" name="activo" checked></label>

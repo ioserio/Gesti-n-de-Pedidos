@@ -19,6 +19,7 @@ $MODULES = [
     'cuotas_hist'     => 'Cuotas Semanales / Histórico',
     'cuota_mensual'   => 'Cuota/Mensual',
     'rutas'           => 'Rutas',
+    'vendedores'      => 'Vendedores',
     'ctacte_vendedor' => 'CTACTE/Vendedor',
     'usuarios'        => 'Usuarios',
     'permisos'        => 'Permisos',
