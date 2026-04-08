@@ -2,6 +2,7 @@
 require_once __DIR__ . '/require_login.php';
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/conexion.php';
+require_once __DIR__ . '/dias_habiles_helper.php';
 
 $fecha = isset($_GET['fecha']) ? $_GET['fecha'] : date('Y-m-d');
 $supervisor = isset($_GET['supervisor']) ? trim((string)$_GET['supervisor']) : '';
@@ -211,6 +212,7 @@ function renderResumenVerticalMonthChart(mysqli $mysqli, string $fecha, string $
     $maxValue = 0.0;
     $cursor = $monthStart;
     $selectedDateStr = $selectedDate->format('Y-m-d');
+    $businessDaysMap = getDiasHabilesMonth($mysqli, (int)$selectedDate->format('Y'), (int)$selectedDate->format('n'));
 
     while ($cursor <= $monthEnd) {
         $dayStr = $cursor->format('Y-m-d');
@@ -225,7 +227,7 @@ function renderResumenVerticalMonthChart(mysqli $mysqli, string $fecha, string $
         $dailyQuotaByDay[$dayStr] = $dailyQuota;
         $dailySalesByDay[$dayStr] = $dailySale;
 
-        if ((int)$cursor->format('N') !== 7) {
+        if (!empty($businessDaysMap[$dayStr])) {
             $chartDates[] = $dayStr;
             $quotaValues[] = $dailyQuota;
             $salesValues[] = $dailySale;
@@ -332,17 +334,8 @@ function renderResumenVerticalMonthChart(mysqli $mysqli, string $fecha, string $
  * Cuenta días hábiles de facturación (lunes a sábado) entre dos fechas inclusive.
  */
 function countBusinessDays(string $startDate, string $endDate): int {
-    $start = strtotime($startDate);
-    $end = strtotime($endDate);
-    if ($end < $start) return 0;
-    $count = 0;
-    for ($t = $start; $t <= $end; $t = strtotime('+1 day', $t)) {
-        $dow = (int)date('N', $t); // 1=lunes ... 7=domingo
-        if ($dow >= 1 && $dow <= 6) {
-            $count++;
-        }
-    }
-    return $count;
+    global $mysqli;
+    return countConfiguredBusinessDays($mysqli, $startDate, $endDate);
 }
 
 function renderResumenMoneyMetric(string $label, float $igvValue, float $biValue): string {
@@ -355,10 +348,8 @@ function renderResumenMoneyMetric(string $label, float $igvValue, float $biValue
 
 /** Devuelve true si la fecha es día hábil de venta (lunes a sábado). */
 function isBusinessDay(string $date): bool {
-    $t = strtotime($date);
-    if ($t === false) return false;
-    $dow = (int)date('N', $t); // 1=lunes ... 7=domingo
-    return ($dow >= 1 && $dow <= 6);
+    global $mysqli;
+    return isConfiguredBusinessDay($mysqli, $date);
 }
 
 $fechas = [];

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/require_login.php';
 require_once __DIR__ . '/init.php';
 require_once 'conexion.php';
+require_once __DIR__ . '/dias_habiles_helper.php';
 
 $fecha = isset($_GET['fecha']) ? $_GET['fecha'] : date('Y-m-d');
 $supervisor = isset($_GET['supervisor']) ? $_GET['supervisor'] : '';
@@ -152,6 +153,7 @@ function renderResumenMonthChart(mysqli $mysqli, string $fecha, string $supervis
     $dailySalesByDay = [];
     $maxValue = 0.0;
     $cursor = $monthStart;
+    $businessDaysMap = getDiasHabilesMonth($mysqli, (int)$selectedDate->format('Y'), (int)$selectedDate->format('n'));
 
     while ($cursor <= $monthEnd) {
         $dayStr = $cursor->format('Y-m-d');
@@ -169,7 +171,7 @@ function renderResumenMonthChart(mysqli $mysqli, string $fecha, string $supervis
         $dailyQuotaByDay[$dayStr] = $dailyQuota;
         $dailySalesByDay[$dayStr] = $dailySale;
 
-        if ((int)$cursor->format('N') === 7) {
+        if (empty($businessDaysMap[$dayStr])) {
             $cursor = $cursor->modify('+1 day');
             continue;
         }
@@ -306,57 +308,64 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 $cuotas = loadCuotasForDate($mysqli, $fecha);
-if ($result->num_rows > 0) {
-    $total_pedidos = 0;
-    $total_monto = 0;
-    $total_cuota = 0.0;
-    $total_faltante = 0.0;
-    $rows = [];
-    while ($row = $result->fetch_assoc()) {
-        $vdRaw = trim((string)$row['Cod_Vendedor']);
-        [, $vdNoZeros, $vdPadded3] = vendorCodeVariants($vdRaw);
+$total_pedidos = 0;
+$total_monto = 0.0;
+$total_cuota = 0.0;
+$rows = [];
+$groups = [];
 
-        $sup = resolveSupervisorForVendor($vdRaw, $vd_supervisor);
-        $row['Supervisor'] = $sup;
-        if ($supervisor && $row['Supervisor'] !== $supervisor) continue;
-        $cuotaVal = resolveVendorQuota($cuotas, $vdRaw);
-        $row['CuotaVal'] = $cuotaVal;
-
-        $total_pedidos += intval($row['ctd_pedidos']);
-        $total_monto += floatval($row['total_igv']);
-        $total_cuota += $cuotaVal;
-        $total_faltante += max(0, $cuotaVal - (float)$row['total_igv']);
-        $rows[] = $row;
+foreach ($cuotas as $vendorCode => $quotaValue) {
+    $supKey = resolveSupervisorForVendor((string)$vendorCode, $vd_supervisor) ?: 'SIN SUPERVISOR';
+    if ($supervisor !== '' && $supKey !== $supervisor) {
+        continue;
     }
-
-    // Faltante total NETO: debe considerar toda la venta (incluida OFICINA)
-    // y compensar sobrecumplimientos entre vendedores/mesas.
-    // Formula: max(0, cuota_total - monto_total).
-    $total_faltante_view = max(0, $total_cuota - $total_monto);
-
-    // Construir grupos para la vista por mesa.
-    $groups = [];
-    if ($groupSup) {
-        foreach ($rows as $row) {
-            $supKey = $row['Supervisor'] ?: 'SIN SUPERVISOR';
-            if (!isset($groups[$supKey])) {
-                $groups[$supKey] = [
-                    'Supervisor' => $supKey,
-                    'ctd_pedidos' => 0,
-                    'total_igv' => 0.0,
-                    'cuota' => 0.0,
-                    'faltante' => 0.0,
-                ];
-            }
-            $groups[$supKey]['ctd_pedidos'] += intval($row['ctd_pedidos']);
-            $groups[$supKey]['total_igv'] += floatval($row['total_igv']);
-            $groups[$supKey]['cuota'] += floatval(isset($row['CuotaVal']) ? $row['CuotaVal'] : 0.0);
-        }
-        foreach ($groups as $k => $g) {
-            $falt = max(0, (float)$g['cuota'] - (float)$g['total_igv']);
-            $groups[$k]['faltante'] = $falt;
-        }
+    $total_cuota += (float)$quotaValue;
+    if (!isset($groups[$supKey])) {
+        $groups[$supKey] = [
+            'Supervisor' => $supKey,
+            'ctd_pedidos' => 0,
+            'total_igv' => 0.0,
+            'cuota' => 0.0,
+            'faltante' => 0.0,
+        ];
     }
+    $groups[$supKey]['cuota'] += (float)$quotaValue;
+}
+
+while ($row = $result->fetch_assoc()) {
+    $vdRaw = trim((string)$row['Cod_Vendedor']);
+    $sup = resolveSupervisorForVendor($vdRaw, $vd_supervisor);
+    $row['Supervisor'] = $sup;
+    if ($supervisor && $row['Supervisor'] !== $supervisor) continue;
+    $cuotaVal = resolveVendorQuota($cuotas, $vdRaw);
+    $row['CuotaVal'] = $cuotaVal;
+
+    $total_pedidos += intval($row['ctd_pedidos']);
+    $total_monto += floatval($row['total_igv']);
+    $rows[] = $row;
+
+    $supKey = $row['Supervisor'] ?: 'SIN SUPERVISOR';
+    if (!isset($groups[$supKey])) {
+        $groups[$supKey] = [
+            'Supervisor' => $supKey,
+            'ctd_pedidos' => 0,
+            'total_igv' => 0.0,
+            'cuota' => 0.0,
+            'faltante' => 0.0,
+        ];
+    }
+    $groups[$supKey]['ctd_pedidos'] += intval($row['ctd_pedidos']);
+    $groups[$supKey]['total_igv'] += floatval($row['total_igv']);
+}
+
+foreach ($groups as $k => $g) {
+    $groups[$k]['faltante'] = max(0, (float)$g['cuota'] - (float)$g['total_igv']);
+}
+
+// Faltante total NETO: debe considerar toda la venta y toda la cuota vigente del día.
+$total_faltante_view = max(0, $total_cuota - $total_monto);
+
+if ($result->num_rows > 0 || $total_cuota > 0) {
 
     echo '<div class="resumen-table-wrap">';
     echo '<table class="resumen-desktop' . ($groupSup ? ' is-grouped' : '') . '">';
@@ -412,35 +421,28 @@ if ($result->num_rows > 0) {
             echo '<td class="avance-cell">' . renderResumenProgress((float)$pct) . '</td>';
             echo '</tr>';
         }
+        if (count($rows) === 0) {
+            echo '<tr><td colspan="8">No hay pedidos para la fecha seleccionada.</td></tr>';
+        }
         echo '</table></div>';
     }
-    
-        // Versión móvil tipo lista con resumen global
-        echo '<div class="resumen-mobile">';
-        echo '<div class="rm-global">';
-        echo   '<div class="rg-metrics">'
-                        . '<span><strong>Pedidos:</strong> ' . $total_pedidos . '</span>'
-                        . '<span><strong>Monto:</strong> S/ ' . number_format($total_monto, 2, '.', ',') . '</span>'
-                        . '<span><strong>Cuota:</strong> S/ ' . number_format($total_cuota, 2, '.', ',') . '</span>'
-                        . '<span><strong>Faltante:</strong> S/ ' . number_format($total_faltante_view, 2, '.', ',') . '</span>'
-                        . '<span><strong>Avance:</strong> ' . $pctGlobal . '%</span>'
-                    . '</div>';
-        echo   '<div class="rg-bar">' . renderResumenProgress((float)$pctGlobal, 'rm-progress') . '</div>';
-        echo '</div>';
-        echo '<h3 class="rm-title">Resumen de Avance' . ($supervisor ? ' — ' . htmlspecialchars($supervisor) : '') . '</h3>';
+
+    // Versión móvil tipo lista con resumen global
+    echo '<div class="resumen-mobile">';
+    echo '<div class="rm-global">';
+    echo   '<div class="rg-metrics">'
+                    . '<span><strong>Pedidos:</strong> ' . $total_pedidos . '</span>'
+                    . '<span><strong>Monto:</strong> S/ ' . number_format($total_monto, 2, '.', ',') . '</span>'
+                    . '<span><strong>Cuota:</strong> S/ ' . number_format($total_cuota, 2, '.', ',') . '</span>'
+                    . '<span><strong>Faltante:</strong> S/ ' . number_format($total_faltante_view, 2, '.', ',') . '</span>'
+                    . '<span><strong>Avance:</strong> ' . $pctGlobal . '%</span>'
+                . '</div>';
+    echo   '<div class="rg-bar">' . renderResumenProgress((float)$pctGlobal, 'rm-progress') . '</div>';
+    echo '</div>';
+    echo '<h3 class="rm-title">Resumen de Avance' . ($supervisor ? ' — ' . htmlspecialchars($supervisor) : '') . '</h3>';
     echo '<div class="rm-list">';
     if ($groupSup) {
-        // Lista móvil agrupada por supervisor
-        // Reutilizar grupos construidos arriba si existe, sino construir aquí
-        $groups2 = [];
         foreach ($groups as $supName => $g) {
-            $groups2[$supName] = [
-                'ctd_pedidos' => (int)$g['ctd_pedidos'],
-                'total_igv' => (float)$g['total_igv'],
-                'cuota' => (float)$g['cuota']
-            ];
-        }
-        foreach ($groups2 as $supName => $g) {
             $ventaVal = (float)$g['total_igv'];
             $cuotaVal = (float)$g['cuota'];
             $pctRaw = $cuotaVal > 0 ? (($ventaVal / $cuotaVal) * 100) : 0;
@@ -455,30 +457,33 @@ if ($result->num_rows > 0) {
             echo '</div>';
         }
     } else {
-    foreach ($rows as $row) {
-        $vdRaw = trim((string)$row['Cod_Vendedor']);
-        $vdNoZeros = ltrim($vdRaw, '0');
-        if ($vdNoZeros === '') { $vdNoZeros = '0'; }
-        $vdPadded3 = str_pad($vdNoZeros, 3, '0', STR_PAD_LEFT);
+        foreach ($rows as $row) {
+            $vdRaw = trim((string)$row['Cod_Vendedor']);
+            $vdNoZeros = ltrim($vdRaw, '0');
+            if ($vdNoZeros === '') { $vdNoZeros = '0'; }
+            $vdPadded3 = str_pad($vdNoZeros, 3, '0', STR_PAD_LEFT);
 
-        $ventaVal = (float)$row['total_igv'];
-        $cuotaVal = isset($row['CuotaVal']) ? (float)$row['CuotaVal'] : 0.0;
-        $pctRaw = $cuotaVal > 0 ? (($ventaVal / $cuotaVal) * 100) : 0;
-        $pct = ($pctRaw < 100) ? floor($pctRaw) : round($pctRaw);
-        $label = htmlspecialchars($vdPadded3 . ' - ' . $row['Nom_Vendedor']);
-        $montoFmt = 'S/ ' . number_format($ventaVal, 2, '.', ',');
-        $cuotaFmt = $cuotaVal > 0 ? ('S/ ' . number_format($cuotaVal, 2, '.', ',')) : '—';
-        $faltFmt = 'S/ ' . number_format(max(0, $cuotaVal - $ventaVal), 2, '.', ',');
-    echo '<div class="rm-item">';
-    echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . ' / Faltante: ' . $faltFmt . '</div></div>';
-    echo   '<div class="rm-progress-wrap">' . renderResumenProgress((float)$pct, 'rm-progress') . '</div>';
-    echo '</div>';
-    }
+            $ventaVal = (float)$row['total_igv'];
+            $cuotaVal = isset($row['CuotaVal']) ? (float)$row['CuotaVal'] : 0.0;
+            $pctRaw = $cuotaVal > 0 ? (($ventaVal / $cuotaVal) * 100) : 0;
+            $pct = ($pctRaw < 100) ? floor($pctRaw) : round($pctRaw);
+            $label = htmlspecialchars($vdPadded3 . ' - ' . $row['Nom_Vendedor']);
+            $montoFmt = 'S/ ' . number_format($ventaVal, 2, '.', ',');
+            $cuotaFmt = $cuotaVal > 0 ? ('S/ ' . number_format($cuotaVal, 2, '.', ',')) : '—';
+            $faltFmt = 'S/ ' . number_format(max(0, $cuotaVal - $ventaVal), 2, '.', ',');
+            echo '<div class="rm-item">';
+            echo   '<div class="rm-label">' . $label . '<div class="rm-sub">' . $montoFmt . ' / ' . $cuotaFmt . ' / Faltante: ' . $faltFmt . '</div></div>';
+            echo   '<div class="rm-progress-wrap">' . renderResumenProgress((float)$pct, 'rm-progress') . '</div>';
+            echo '</div>';
+        }
+        if (count($rows) === 0) {
+            echo '<div class="rm-item"><div class="rm-label">No hay pedidos para la fecha seleccionada.</div></div>';
+        }
     }
     echo '</div>'; // .rm-list
     echo '</div>'; // .resumen-mobile
 } else {
-    echo '<p>No hay pedidos para hoy.</p>';
+    echo '<p>No hay cuotas vigentes ni pedidos para la fecha seleccionada.</p>';
 }
 $stmt->close();
 $mysqli->close();

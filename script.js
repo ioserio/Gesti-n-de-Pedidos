@@ -141,6 +141,7 @@ const MODULE_PERMISSION_MAP = {
     'recojos':'recojos',
     'admin':'admin',
     'cuota_mensual':'cuota_mensual',
+    'dias_habiles_mes':'dias_habiles_mes',
     'cuotas_hist':'cuotas_hist',
     'rutas':'rutas',
     'vendedores':'vendedores',
@@ -165,6 +166,7 @@ const MODULE_TAB_META = {
     'recojos': { title: 'Recojos', closable: true },
     'admin': { title: 'Admin Cuotas', closable: true },
     'cuota_mensual': { title: 'Cuota Mensual', closable: true },
+    'dias_habiles_mes': { title: 'Días Hábiles x mes', closable: true },
     'rutas': { title: 'Rutas', closable: true },
     'vendedores': { title: 'Vendedores', closable: true },
     'ctacte_vendedor': { title: 'CTACTE/Vendedor', closable: true },
@@ -356,6 +358,7 @@ function getModuleSection(modulo) {
         recojos: 'modulo-recojos',
         admin: 'modulo-admin',
         cuota_mensual: 'modulo-cuota-mensual',
+        dias_habiles_mes: 'modulo-dias-habiles-mes',
         rutas: 'modulo-rutas',
         vendedores: 'modulo-vendedores',
         ctacte_vendedor: 'modulo-ctacte-vendedor',
@@ -432,6 +435,8 @@ function activateModuleContent(modulo) {
     if (admin) admin.style.display = (modulo === 'admin') ? 'block' : 'none';
     const cuotaMensual = document.getElementById('modulo-cuota-mensual');
     if (cuotaMensual) cuotaMensual.style.display = (modulo === 'cuota_mensual') ? 'block' : 'none';
+    const diasHabilesMes = document.getElementById('modulo-dias-habiles-mes');
+    if (diasHabilesMes) diasHabilesMes.style.display = (modulo === 'dias_habiles_mes') ? 'block' : 'none';
         const herramientas = document.getElementById('modulo-herramientas');
         if (herramientas) herramientas.style.display = (modulo === 'herramientas') ? 'block' : 'none';
         const rutas = document.getElementById('modulo-rutas');
@@ -496,6 +501,8 @@ function activateModuleContent(modulo) {
             setTimeout(function(){ cargarHorariosConfig(); }, 50);
         } else if (modulo === 'cuota_mensual') {
             setTimeout(function(){ initCuotaMensualModule(); cargarCuotaMensual(); }, 50);
+        } else if (modulo === 'dias_habiles_mes') {
+            setTimeout(function(){ initDiasHabilesMesModule(); cargarDiasHabilesMes(); }, 50);
         } else if (modulo === 'devoluciones') {
             setTimeout(function(){
                 restoreModuleState('devoluciones');
@@ -2684,6 +2691,32 @@ function cargarVendedoresAdmin(){
         .catch(err => { cont.innerHTML = '<p>Error al cargar vendedores: ' + (err.message || '') + '</p>'; });
 }
 
+function cargarDiasHabilesMes(){
+    const cont = document.getElementById('dias-habiles-lista');
+    const anio = document.getElementById('dhm_anio')?.value || new Date().getFullYear();
+    const mes = document.getElementById('dhm_mes')?.value || String(new Date().getMonth() + 1);
+    const msg = document.getElementById('dias-habiles-msg');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando días hábiles...</p>';
+    if (msg) msg.textContent = '';
+    fetch('dias_habiles_api.php?action=list&anio=' + encodeURIComponent(anio) + '&mes=' + encodeURIComponent(mes))
+        .then(r => {
+            if (!r.ok) return r.text().then(t => { throw new Error(t || ('HTTP ' + r.status)); });
+            return r.text();
+        })
+        .then(html => { cont.innerHTML = html; })
+        .catch(err => {
+            cont.innerHTML = '<p>Error al cargar días hábiles: ' + (err.message || '') + '</p>';
+        });
+}
+
+function initDiasHabilesMesModule(){
+    const anio = document.getElementById('dhm_anio');
+    const mes = document.getElementById('dhm_mes');
+    if (anio && !anio.value) anio.value = String(new Date().getFullYear());
+    if (mes && !mes.value) mes.value = String(new Date().getMonth() + 1);
+}
+
 function cargarOpcionesSupervisorVendedor(){
     const select = document.getElementById('v_supervisor');
     const wrap = document.getElementById('v_supervisor_wrap');
@@ -2783,6 +2816,13 @@ document.addEventListener('DOMContentLoaded', function(){
                 });
         });
     }
+    const formDiasHabiles = document.getElementById('form-dias-habiles-mes');
+    if (formDiasHabiles) {
+        formDiasHabiles.addEventListener('submit', function(e){
+            e.preventDefault();
+            cargarDiasHabilesMes();
+        });
+    }
     // Delegación de acciones en listado
     const lista = document.getElementById('lista-usuarios');
     if (lista) {
@@ -2875,6 +2915,52 @@ document.addEventListener('DOMContentLoaded', function(){
                     })
                     .catch(() => alert('No se pudo eliminar el vendedor'));
             }
+        });
+    }
+    const listaDiasHabiles = document.getElementById('dias-habiles-lista');
+    if (listaDiasHabiles) {
+        listaDiasHabiles.addEventListener('change', function(e){
+            const chk = e.target.closest('.dh-toggle');
+            const tr = e.target.closest('tr[data-fecha]');
+            if (!chk || !tr) return;
+            const fecha = tr.getAttribute('data-fecha') || '';
+            const msg = document.getElementById('dias-habiles-msg');
+            const fd = new FormData();
+            fd.append('action', 'toggle');
+            fd.append('fecha', fecha);
+            fd.append('habil', chk.checked ? '1' : '0');
+            fetch('dias_habiles_api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => {
+                    if (!res || res.ok !== true) throw new Error(res && res.error ? res.error : 'Error');
+                    if (msg) msg.textContent = 'Cambio guardado';
+                    cargarDiasHabilesMes();
+                })
+                .catch(() => {
+                    chk.checked = !chk.checked;
+                    if (msg) msg.textContent = 'No se pudo guardar el cambio';
+                });
+        });
+        listaDiasHabiles.addEventListener('click', function(e){
+            const btn = e.target.closest('#btn-reset-dias-habiles');
+            if (!btn) return;
+            const anio = document.getElementById('dhm_anio')?.value || new Date().getFullYear();
+            const mes = document.getElementById('dhm_mes')?.value || String(new Date().getMonth() + 1);
+            const msg = document.getElementById('dias-habiles-msg');
+            const fd = new FormData();
+            fd.append('action', 'reset');
+            fd.append('anio', String(anio));
+            fd.append('mes', String(mes));
+            fetch('dias_habiles_api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => {
+                    if (!res || res.ok !== true) throw new Error('Error');
+                    if (msg) msg.textContent = 'Mes restaurado';
+                    cargarDiasHabilesMes();
+                })
+                .catch(() => {
+                    if (msg) msg.textContent = 'No se pudo restaurar el mes';
+                });
         });
     }
 });

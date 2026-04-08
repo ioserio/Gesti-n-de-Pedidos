@@ -18,6 +18,7 @@ $MODULES = [
     'admin'           => 'Administrador de Cuotas (Legacy)',
     'cuotas_hist'     => 'Cuotas Semanales / Histórico',
     'cuota_mensual'   => 'Cuota/Mensual',
+    'dias_habiles_mes'=> 'Días Hábiles x mes',
     'rutas'           => 'Rutas',
     'vendedores'      => 'Vendedores',
     'ctacte_vendedor' => 'CTACTE/Vendedor',

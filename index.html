@@ -102,6 +102,7 @@
                         <li><a href="#" data-mod="horarios" onclick="mostrarModulo('horarios')">Horarios de Ingreso</a></li>
                         <li><a href="cuotas_gestion.php" data-mod="cuotas_hist">Cuotas Semanales / Histórico</a></li>
                         <li><a href="#" data-mod="cuota_mensual" onclick="mostrarModulo('cuota_mensual')">Cuota/Mensual</a></li>
+                        <li><a href="#" data-mod="dias_habiles_mes" onclick="mostrarModulo('dias_habiles_mes')">Días Hábiles x mes</a></li>
                         <li><a href="#" data-mod="rutas" onclick="mostrarModulo('rutas')">Rutas</a></li>
                         <li><a href="#" data-mod="vendedores" onclick="mostrarModulo('vendedores')">Vendedores</a></li>
                         <li><a href="#" data-mod="ctacte_vendedor" onclick="mostrarModulo('ctacte_vendedor')">CTACTE/Vendedor</a></li>
@@ -141,6 +142,15 @@
             <button type="submit">Subir</button>
         </form>
         <div id="preview"></div>
+
+        <hr style="margin:24px 0;">
+
+        <h2>Subir Excel de Consulta de Pedidos x Día Detallado</h2>
+        <p>Selecciona tu archivo <b>CONSULTA DE PEDIDOS X DIA DETALLADO.xlsx</b> para cargarlo en la tabla <b>pedidos_x_dia_detallado</b>. El sistema detecta la fecha del archivo y reemplaza los registros existentes de esa misma fecha.</p>
+        <form action="procesar_excel_detallado.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
+            <input type="file" name="archivo_excel_detallado" accept=".xlsx,.xls" required>
+            <button type="submit" style="margin-left:14px;">Subir Detallado</button>
+        </form>
 
         <hr style="margin:24px 0;">
 
@@ -401,6 +411,31 @@
 
         <div id="cm_msg" style="font-size:12px; margin:8px 0; color:#555;"></div>
         <div id="cm_lista"></div>
+    </section>
+    <section id="modulo-dias-habiles-mes" style="display:none;">
+        <h2>Días Hábiles x mes</h2>
+        <form id="form-dias-habiles-mes" style="margin-bottom:12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <label for="dhm_anio">Año:</label>
+            <input type="number" id="dhm_anio" min="2000" max="2100" style="width:90px;">
+            <label for="dhm_mes">Mes:</label>
+            <select id="dhm_mes">
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+            <button type="submit">Consultar</button>
+        </form>
+        <div id="dias-habiles-msg" style="font-size:12px; margin:8px 0; color:#555;"></div>
+        <div id="dias-habiles-lista"></div>
     </section>
     <section id="modulo-ctacte-vendedor" style="display:none;">
         <h2>CTACTE/Vendedor</h2>
