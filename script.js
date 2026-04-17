@@ -1174,7 +1174,182 @@ function setFechaHoyAlmacen(){
         const a1 = document.getElementById('alm_fecha'); if (a1) a1.value = val;
         const a2 = document.getElementById('alm_fecha_map'); if (a2) a2.value = val;
         const a3 = document.getElementById('alm_list_fecha'); if (a3) a3.value = val;
+        const a4 = document.getElementById('alm_foco_desde'); if (a4 && !a4.value) a4.value = val;
+        const a5 = document.getElementById('alm_foco_meta_desde'); if (a5 && !a5.value) a5.value = val;
+        const a6 = document.getElementById('alm_foco_avance_fecha'); if (a6 && !a6.value) a6.value = val;
 }
+
+window.__almacenSubtab = window.__almacenSubtab || 'moldes';
+window.__almacenFocoOptions = window.__almacenFocoOptions || null;
+
+function setAlmacenMessage(targetId, message, isError){
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    el.textContent = message || '';
+    el.className = 'alm-focus-msg' + (message ? (isError ? ' is-error' : ' is-success') : '');
+}
+
+function resetAlmacenProductForm(){
+    const form = document.getElementById('alm-foco-product-form');
+    if (!form) return;
+    form.reset();
+    const id = document.getElementById('alm_foco_producto_id'); if (id) id.value = '';
+    const active = document.getElementById('alm_foco_activo'); if (active) active.checked = true;
+    const nombre = document.getElementById('alm_foco_nombre'); if (nombre) nombre.value = '';
+    const submit = document.getElementById('alm-foco-product-submit'); if (submit) submit.textContent = 'Agregar producto foco';
+    const cancel = document.getElementById('alm-foco-product-cancel'); if (cancel) cancel.style.display = 'none';
+    setFechaHoyAlmacen();
+}
+
+function lookupAlmacenCatalogProduct(code){
+    const codigo = String(code || '').trim();
+    if (!codigo) return Promise.resolve(null);
+    const url = new URL('almacen_foco_api.php', location.href);
+    url.searchParams.set('action', 'product_lookup');
+    url.searchParams.set('codigo', codigo);
+    return fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
+        .then(async function(r){
+            const data = await r.json().catch(function(){ return null; });
+            if (!r.ok || !data || data.ok !== true || !data.product) {
+                return null;
+            }
+            return data.product;
+        })
+        .catch(function(){ return null; });
+}
+
+function syncAlmacenProductName(showError){
+    const codigoEl = document.getElementById('alm_foco_codigo');
+    const nombreEl = document.getElementById('alm_foco_nombre');
+    if (!codigoEl || !nombreEl) return Promise.resolve(null);
+    const codigo = (codigoEl.value || '').trim();
+    if (!codigo) {
+        nombreEl.value = '';
+        return Promise.resolve(null);
+    }
+    return lookupAlmacenCatalogProduct(codigo).then(function(product){
+        if (product && product.nombre) {
+            codigoEl.value = product.codigo || codigo;
+            nombreEl.value = product.nombre;
+            return product;
+        }
+        nombreEl.value = '';
+        if (showError) {
+            setAlmacenMessage('alm-foco-product-msg', 'El código no existe en codigo_productos.', true);
+        }
+        return null;
+    });
+}
+
+function resetAlmacenMetaForm(){
+    const form = document.getElementById('alm-foco-meta-form');
+    if (!form) return;
+    form.reset();
+    const id = document.getElementById('alm_foco_meta_id'); if (id) id.value = '';
+    const active = document.getElementById('alm_foco_meta_activo'); if (active) active.value = '1';
+    const submit = document.getElementById('alm-foco-meta-submit'); if (submit) submit.textContent = 'Agregar meta';
+    const cancel = document.getElementById('alm-foco-meta-cancel'); if (cancel) cancel.style.display = 'none';
+    setFechaHoyAlmacen();
+}
+
+async function cargarAlmacenFocoOptions(forceReload){
+    if (window.__almacenFocoOptions && !forceReload) return window.__almacenFocoOptions;
+    const res = await fetch('almacen_foco_api.php?action=options', { headers: { 'Accept': 'application/json' } });
+    const data = await res.json();
+    if (!data || data.ok !== true) throw new Error('No se pudieron cargar las opciones de foco');
+    window.__almacenFocoOptions = data;
+
+    const productSel = document.getElementById('alm_foco_meta_producto');
+    if (productSel) {
+        const opts = ['<option value="">Seleccione...</option>'];
+        (data.productos || []).forEach(function(item){
+            opts.push('<option value="' + item.id + '">' + String(item.codigo || '').replaceAll('<','&lt;') + ' - ' + String(item.nombre || '').replaceAll('<','&lt;') + '</option>');
+        });
+        productSel.innerHTML = opts.join('');
+    }
+
+    const vendorSel = document.getElementById('alm_foco_meta_vendedor');
+    if (vendorSel) {
+        const opts = ['<option value="">Global</option>'];
+        (data.vendedores || []).forEach(function(item){
+            const label = String(item.codigo || '') + ' - ' + String(item.nombre || '');
+            opts.push('<option value="' + String(item.codigo || '').replaceAll('"','&quot;') + '">' + label.replaceAll('<','&lt;') + '</option>');
+        });
+        vendorSel.innerHTML = opts.join('');
+    }
+
+    const supervisorSel = document.getElementById('alm_foco_meta_supervisor');
+    if (supervisorSel) {
+        const opts = ['<option value="">Todos</option>'];
+        (data.supervisores || []).forEach(function(item){
+            opts.push('<option value="' + item.id + '">' + String(item.label || '').replaceAll('<','&lt;') + '</option>');
+        });
+        supervisorSel.innerHTML = opts.join('');
+    }
+    return data;
+}
+
+function cargarAlmacenFocoProductos(){
+    const cont = document.getElementById('alm-foco-product-list');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando productos foco...</p>';
+    fetch('almacen_foco_api.php?action=products_list')
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(() => { cont.innerHTML = '<p>Error al cargar productos foco.</p>'; });
+}
+
+function cargarAlmacenFocoMetas(){
+    const cont = document.getElementById('alm-foco-meta-list');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando metas foco...</p>';
+    fetch('almacen_foco_api.php?action=metas_list')
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(() => { cont.innerHTML = '<p>Error al cargar metas foco.</p>'; });
+}
+
+function cargarAlmacenFocoAvance(){
+    const cont = document.getElementById('alm-foco-avance-content');
+    const fecha = document.getElementById('alm_foco_avance_fecha')?.value || new Date().toISOString().slice(0,10);
+    const mode = document.getElementById('alm_foco_avance_mode')?.value || 'day';
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando avance foco...</p>';
+    const qs = new URLSearchParams();
+    qs.set('action', 'avance');
+    qs.set('date', fecha);
+    qs.set('mode', mode);
+    fetch('almacen_foco_api.php?' + qs.toString())
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(() => { cont.innerHTML = '<p>Error al cargar el avance de productos foco.</p>'; });
+}
+
+function showAlmacenSubtab(tab){
+    const valid = ['moldes', 'foco-productos', 'foco-metas', 'foco-avance'];
+    if (!valid.includes(tab)) tab = 'moldes';
+    window.__almacenSubtab = tab;
+    document.querySelectorAll('#alm-subtabs .alm-subtab').forEach(function(btn){
+        btn.classList.toggle('is-active', btn.getAttribute('data-alm-tab') === tab);
+    });
+    const panels = {
+        'moldes': document.getElementById('alm-panel-moldes'),
+        'foco-productos': document.getElementById('alm-panel-foco-productos'),
+        'foco-metas': document.getElementById('alm-panel-foco-metas'),
+        'foco-avance': document.getElementById('alm-panel-foco-avance')
+    };
+    Object.keys(panels).forEach(function(key){
+        if (panels[key]) panels[key].style.display = (key === tab) ? 'block' : 'none';
+    });
+    if (tab === 'moldes') cargarAlmacen();
+    if (tab === 'foco-productos') cargarAlmacenFocoProductos();
+    if (tab === 'foco-metas') {
+        cargarAlmacenFocoOptions().catch(function(){});
+        cargarAlmacenFocoMetas();
+    }
+    if (tab === 'foco-avance') cargarAlmacenFocoAvance();
+}
+
 function initAlmacen(){
         setFechaHoyAlmacen();
         const form = document.getElementById('alm-list-form');
@@ -1182,7 +1357,169 @@ function initAlmacen(){
                 form.__wired = true;
                 form.addEventListener('submit', function(e){ e.preventDefault(); cargarAlmacen(); });
         }
-        cargarAlmacen();
+        const tabs = document.querySelectorAll('#alm-subtabs .alm-subtab');
+        tabs.forEach(function(btn){
+            if (btn.__wired) return;
+            btn.__wired = true;
+            btn.addEventListener('click', function(){ showAlmacenSubtab(btn.getAttribute('data-alm-tab') || 'moldes'); });
+        });
+
+        const productForm = document.getElementById('alm-foco-product-form');
+        if (productForm && !productForm.__wired) {
+            productForm.__wired = true;
+            const codigoInput = document.getElementById('alm_foco_codigo');
+            if (codigoInput && !codigoInput.__wiredLookup) {
+                codigoInput.__wiredLookup = true;
+                codigoInput.addEventListener('change', function(){ syncAlmacenProductName(false); });
+                codigoInput.addEventListener('blur', function(){ syncAlmacenProductName(false); });
+            }
+            productForm.addEventListener('submit', function(e){
+                e.preventDefault();
+                syncAlmacenProductName(true).then(function(product){
+                    if (!product) return;
+                    const fd = new FormData(productForm);
+                    fd.set('action', 'product_save');
+                    fd.set('codigo_producto', product.codigo || (document.getElementById('alm_foco_codigo')?.value || '').trim());
+                    fd.set('nombre_producto', product.nombre || '');
+                    fd.set('activo', document.getElementById('alm_foco_activo')?.checked ? '1' : '0');
+                    setAlmacenMessage('alm-foco-product-msg', 'Guardando producto foco...', false);
+                    fetch('almacen_foco_api.php', { method:'POST', body: fd, headers:{ 'Accept':'application/json' } })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (!data || data.ok !== true) throw new Error(data && data.error ? data.error : 'Error');
+                            setAlmacenMessage('alm-foco-product-msg', 'Producto foco guardado correctamente.', false);
+                            resetAlmacenProductForm();
+                            window.__almacenFocoOptions = null;
+                            cargarAlmacenFocoProductos();
+                            cargarAlmacenFocoOptions(true).catch(function(){});
+                        })
+                        .catch(err => setAlmacenMessage('alm-foco-product-msg', 'No se pudo guardar (' + (err.message || 'error') + ').', true));
+                });
+            });
+        }
+
+        const productCancel = document.getElementById('alm-foco-product-cancel');
+        if (productCancel && !productCancel.__wired) {
+            productCancel.__wired = true;
+            productCancel.addEventListener('click', function(){ resetAlmacenProductForm(); setAlmacenMessage('alm-foco-product-msg', '', false); });
+        }
+
+        const metaForm = document.getElementById('alm-foco-meta-form');
+        if (metaForm && !metaForm.__wired) {
+            metaForm.__wired = true;
+            metaForm.addEventListener('submit', function(e){
+                e.preventDefault();
+                const fd = new FormData(metaForm);
+                fd.set('action', 'meta_save');
+                setAlmacenMessage('alm-foco-meta-msg', 'Guardando meta foco...', false);
+                fetch('almacen_foco_api.php', { method:'POST', body: fd, headers:{ 'Accept':'application/json' } })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data || data.ok !== true) throw new Error(data && data.error ? data.error : 'Error');
+                        setAlmacenMessage('alm-foco-meta-msg', 'Meta guardada correctamente.', false);
+                        resetAlmacenMetaForm();
+                        cargarAlmacenFocoMetas();
+                    })
+                    .catch(err => setAlmacenMessage('alm-foco-meta-msg', 'No se pudo guardar (' + (err.message || 'error') + ').', true));
+            });
+        }
+
+        const metaCancel = document.getElementById('alm-foco-meta-cancel');
+        if (metaCancel && !metaCancel.__wired) {
+            metaCancel.__wired = true;
+            metaCancel.addEventListener('click', function(){ resetAlmacenMetaForm(); setAlmacenMessage('alm-foco-meta-msg', '', false); });
+        }
+
+        const reportForm = document.getElementById('alm-foco-avance-form');
+        if (reportForm && !reportForm.__wired) {
+            reportForm.__wired = true;
+            reportForm.addEventListener('submit', function(e){ e.preventDefault(); cargarAlmacenFocoAvance(); });
+        }
+
+        const productList = document.getElementById('alm-foco-product-list');
+        if (productList && !productList.__wired) {
+            productList.__wired = true;
+            productList.addEventListener('click', function(e){
+                const btnEdit = e.target.closest('.alm-foco-product-edit');
+                if (btnEdit) {
+                    document.getElementById('alm_foco_producto_id').value = btnEdit.getAttribute('data-id') || '';
+                    document.getElementById('alm_foco_codigo').value = btnEdit.getAttribute('data-codigo') || '';
+                    document.getElementById('alm_foco_nombre').value = btnEdit.getAttribute('data-nombre') || '';
+                    document.getElementById('alm_foco_desde').value = btnEdit.getAttribute('data-desde') || '';
+                    document.getElementById('alm_foco_hasta').value = btnEdit.getAttribute('data-hasta') || '';
+                    document.getElementById('alm_foco_observacion').value = btnEdit.getAttribute('data-observacion') || '';
+                    document.getElementById('alm_foco_activo').checked = (btnEdit.getAttribute('data-activo') || '1') === '1';
+                    const submit = document.getElementById('alm-foco-product-submit'); if (submit) submit.textContent = 'Guardar cambios';
+                    const cancel = document.getElementById('alm-foco-product-cancel'); if (cancel) cancel.style.display = 'inline-block';
+                    setAlmacenMessage('alm-foco-product-msg', 'Modo edición activo.', false);
+                    return;
+                }
+                const btnDelete = e.target.closest('.alm-foco-product-delete');
+                if (btnDelete) {
+                    const id = btnDelete.getAttribute('data-id') || '';
+                    if (!id || !confirm('¿Eliminar este producto foco?')) return;
+                    const fd = new FormData();
+                    fd.append('action', 'product_delete');
+                    fd.append('id', id);
+                    fetch('almacen_foco_api.php', { method:'POST', body: fd, headers:{ 'Accept':'application/json' } })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (!data || data.ok !== true) throw new Error(data && data.error ? data.error : 'Error');
+                            setAlmacenMessage('alm-foco-product-msg', 'Producto foco eliminado.', false);
+                            resetAlmacenProductForm();
+                            window.__almacenFocoOptions = null;
+                            cargarAlmacenFocoProductos();
+                            cargarAlmacenFocoOptions(true).catch(function(){});
+                        })
+                        .catch(err => setAlmacenMessage('alm-foco-product-msg', 'No se pudo eliminar (' + (err.message || 'error') + ').', true));
+                }
+            });
+        }
+
+        const metaList = document.getElementById('alm-foco-meta-list');
+        if (metaList && !metaList.__wired) {
+            metaList.__wired = true;
+            metaList.addEventListener('click', function(e){
+                const btnEdit = e.target.closest('.alm-foco-meta-edit');
+                if (btnEdit) {
+                    cargarAlmacenFocoOptions().then(function(){
+                        document.getElementById('alm_foco_meta_id').value = btnEdit.getAttribute('data-id') || '';
+                        document.getElementById('alm_foco_meta_producto').value = btnEdit.getAttribute('data-producto-id') || '';
+                        document.getElementById('alm_foco_meta_cantidad').value = btnEdit.getAttribute('data-meta') || '';
+                        document.getElementById('alm_foco_meta_desde').value = btnEdit.getAttribute('data-desde') || '';
+                        document.getElementById('alm_foco_meta_hasta').value = btnEdit.getAttribute('data-hasta') || '';
+                        document.getElementById('alm_foco_meta_vendedor').value = btnEdit.getAttribute('data-vendedor') || '';
+                        document.getElementById('alm_foco_meta_supervisor').value = btnEdit.getAttribute('data-supervisor-id') || '';
+                        document.getElementById('alm_foco_meta_activo').value = (btnEdit.getAttribute('data-activo') || '1');
+                        document.getElementById('alm_foco_meta_observacion').value = btnEdit.getAttribute('data-observacion') || '';
+                        const submit = document.getElementById('alm-foco-meta-submit'); if (submit) submit.textContent = 'Guardar cambios';
+                        const cancel = document.getElementById('alm-foco-meta-cancel'); if (cancel) cancel.style.display = 'inline-block';
+                        setAlmacenMessage('alm-foco-meta-msg', 'Modo edición activo.', false);
+                    }).catch(function(){});
+                    return;
+                }
+                const btnDelete = e.target.closest('.alm-foco-meta-delete');
+                if (btnDelete) {
+                    const id = btnDelete.getAttribute('data-id') || '';
+                    if (!id || !confirm('¿Eliminar esta meta foco?')) return;
+                    const fd = new FormData();
+                    fd.append('action', 'meta_delete');
+                    fd.append('id', id);
+                    fetch('almacen_foco_api.php', { method:'POST', body: fd, headers:{ 'Accept':'application/json' } })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (!data || data.ok !== true) throw new Error(data && data.error ? data.error : 'Error');
+                            setAlmacenMessage('alm-foco-meta-msg', 'Meta foco eliminada.', false);
+                            resetAlmacenMetaForm();
+                            cargarAlmacenFocoMetas();
+                        })
+                        .catch(err => setAlmacenMessage('alm-foco-meta-msg', 'No se pudo eliminar (' + (err.message || 'error') + ').', true));
+                }
+            });
+        }
+
+        cargarAlmacenFocoOptions().catch(function(){});
+        showAlmacenSubtab(window.__almacenSubtab || 'moldes');
 }
 function cargarAlmacen(){
         const cont = document.getElementById('almacen-lista'); if (!cont) return;

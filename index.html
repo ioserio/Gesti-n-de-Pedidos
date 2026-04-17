@@ -290,30 +290,116 @@
         </form>
         <div id="cobranzas"></div>
     </section>
-    <!-- Módulo Almacén: placeholder inicial -->
     <section id="modulo-almacen" style="display:none;">
         <h2>Almacén</h2>
         <p style="color:#555;">Carga tu hoja de moldes (XLS/XLSX) para que el equipo de almacén pueda digitar el peso real. El mapeo <b>CÓDIGO→CAMIÓN</b> ahora se sube por separado y se guarda en su propia tabla.</p>
-        <!-- Importación independiente: Hoja de moldes -->
-        <form action="almacen_import.php" method="post" enctype="multipart/form-data" style="margin:10px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-            <input type="hidden" name="action" value="moldes">
-            <label>Fecha: <input type="date" name="fecha" id="alm_fecha" required></label>
-            <label>Hoja de moldes (XLS/XLSX): <input type="file" name="xls" accept=".xls,.xlsx" required></label>
-            <label style="display:inline-flex; align-items:center; gap:6px;"><input type="checkbox" name="truncate" value="1">Reemplazar registros de esa fecha</label>
-            <button type="submit">Importar moldes</button>
-        </form>
+        <div class="alm-subtabs" id="alm-subtabs">
+            <button type="button" class="alm-subtab is-active" data-alm-tab="moldes">Almacén: Moldes</button>
+            <button type="button" class="alm-subtab" data-alm-tab="foco-productos">Almacén: Productos foco</button>
+            <button type="button" class="alm-subtab" data-alm-tab="foco-metas">Almacén: Metas foco</button>
+            <button type="button" class="alm-subtab" data-alm-tab="foco-avance">Almacén: Avance foco</button>
+        </div>
 
-        <!-- Importación independiente: Mapeo CODIGO→CAMIÓN -->
-        <form action="almacen_import.php?action=map" method="post" enctype="multipart/form-data" style="margin:10px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-            <label>Mapeo CODIGO→CAMIÓN (XLS/XLSX): <input type="file" name="map_camion" accept=".xls,.xlsx" required></label>
-            <button type="submit">Importar mapeo</button>
-        </form>
-        <hr style="margin:16px 0;">
-        <form id="alm-list-form" style="margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <label>Fecha: <input type="date" id="alm_list_fecha" required></label>
-            <button type="submit">Ver</button>
-        </form>
-        <div id="almacen-lista"></div>
+        <div class="alm-panel" id="alm-panel-moldes">
+            <form action="almacen_import.php" method="post" enctype="multipart/form-data" style="margin:10px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+                <input type="hidden" name="action" value="moldes">
+                <label>Fecha: <input type="date" name="fecha" id="alm_fecha" required></label>
+                <label>Hoja de moldes (XLS/XLSX): <input type="file" name="xls" accept=".xls,.xlsx" required></label>
+                <label style="display:inline-flex; align-items:center; gap:6px;"><input type="checkbox" name="truncate" value="1">Reemplazar registros de esa fecha</label>
+                <button type="submit">Importar moldes</button>
+            </form>
+
+            <form action="almacen_import.php?action=map" method="post" enctype="multipart/form-data" style="margin:10px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+                <label>Mapeo CODIGO→CAMIÓN (XLS/XLSX): <input type="file" name="map_camion" accept=".xls,.xlsx" required></label>
+                <button type="submit">Importar mapeo</button>
+            </form>
+            <hr style="margin:16px 0;">
+            <form id="alm-list-form" style="margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <label>Fecha: <input type="date" id="alm_list_fecha" required></label>
+                <button type="submit">Ver</button>
+            </form>
+            <div id="almacen-lista"></div>
+        </div>
+
+        <div class="alm-panel" id="alm-panel-foco-productos" style="display:none;">
+            <div class="alm-focus-card">
+                <h3>Productos foco</h3>
+                <p>Define qué productos participan en la campaña foco y su vigencia.</p>
+                <form id="alm-foco-product-form" class="alm-focus-form">
+                    <input type="hidden" id="alm_foco_producto_id" name="id">
+                    <div class="alm-focus-form-grid">
+                        <label>Código <input type="text" id="alm_foco_codigo" name="codigo_producto" placeholder="Ej: 9807" required></label>
+                        <label>Nombre <input type="text" id="alm_foco_nombre" name="nombre_producto" placeholder="Se completa desde código_productos" required readonly></label>
+                        <label>Desde <input type="date" id="alm_foco_desde" name="fecha_inicio"></label>
+                        <label>Hasta <input type="date" id="alm_foco_hasta" name="fecha_fin"></label>
+                        <label class="alm-focus-form-wide">Observación <input type="text" id="alm_foco_observacion" name="observacion" placeholder="Campaña abril, lanzamiento"></label>
+                        <label class="alm-focus-check"><input type="checkbox" id="alm_foco_activo" name="activo" checked> Activo</label>
+                    </div>
+                    <div class="alm-focus-actions">
+                        <button type="submit" id="alm-foco-product-submit">Agregar producto foco</button>
+                        <button type="button" id="alm-foco-product-cancel" style="display:none; background:#6c757d;">Cancelar edición</button>
+                    </div>
+                </form>
+                <div id="alm-foco-product-msg" class="alm-focus-msg"></div>
+                <div id="alm-foco-product-list"></div>
+            </div>
+        </div>
+
+        <div class="alm-panel" id="alm-panel-foco-metas" style="display:none;">
+            <div class="alm-focus-card">
+                <h3>Metas de foco</h3>
+                <p>Registra metas globales o específicas por vendedor/supervisor para los productos foco.</p>
+                <form id="alm-foco-meta-form" class="alm-focus-form">
+                    <input type="hidden" id="alm_foco_meta_id" name="id">
+                    <div class="alm-focus-form-grid">
+                        <label>Producto foco
+                            <select id="alm_foco_meta_producto" name="producto_foco_id" required></select>
+                        </label>
+                        <label>Meta cantidad <input type="number" id="alm_foco_meta_cantidad" name="meta_cantidad" min="0.01" step="0.01" required></label>
+                        <label>Desde <input type="date" id="alm_foco_meta_desde" name="fecha_inicio"></label>
+                        <label>Hasta <input type="date" id="alm_foco_meta_hasta" name="fecha_fin"></label>
+                        <label>Vendedor
+                            <select id="alm_foco_meta_vendedor" name="cod_vendedor"></select>
+                        </label>
+                        <label>Supervisor
+                            <select id="alm_foco_meta_supervisor" name="supervisor_id"></select>
+                        </label>
+                        <label class="alm-focus-form-wide">Observación <input type="text" id="alm_foco_meta_observacion" name="observacion" placeholder="Meta del mes, campaña puntual"></label>
+                        <label>Activo
+                            <select id="alm_foco_meta_activo" name="activo">
+                                <option value="1">Sí</option>
+                                <option value="0">No</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="alm-focus-actions">
+                        <button type="submit" id="alm-foco-meta-submit">Agregar meta</button>
+                        <button type="button" id="alm-foco-meta-cancel" style="display:none; background:#6c757d;">Cancelar edición</button>
+                    </div>
+                </form>
+                <div id="alm-foco-meta-msg" class="alm-focus-msg"></div>
+                <div id="alm-foco-meta-list"></div>
+            </div>
+        </div>
+
+        <div class="alm-panel" id="alm-panel-foco-avance" style="display:none;">
+            <div class="alm-focus-card">
+                <h3>Avance de productos foco</h3>
+                <p>Consulta el foco por día o el acumulado del mes presente, con resumen por mesa y detalle por vendedor.</p>
+                <form id="alm-foco-avance-form" class="alm-focus-form alm-focus-form-inline">
+                    <label>Fecha <input type="date" id="alm_foco_avance_fecha" name="date" required></label>
+                    <label>Vista
+                        <select id="alm_foco_avance_mode" name="mode">
+                            <option value="day">Día</option>
+                            <option value="month">Acumulado mes</option>
+                        </select>
+                    </label>
+                    <button type="submit">Ver avance</button>
+                </form>
+                <div id="alm-foco-avance-msg" class="alm-focus-msg"></div>
+                <div id="alm-foco-avance-content"></div>
+            </div>
+        </div>
     </section>
     <section id="modulo-admin" style="display:none;">
         <h2>Administrador de Cuotas</h2>

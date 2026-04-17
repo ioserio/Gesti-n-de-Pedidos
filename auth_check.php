@@ -6,6 +6,10 @@ $id = $ok ? (int)($_SESSION['user_id'] ?? 0) : 0;
 $usuario = $ok ? ($_SESSION['usuario'] ?? '') : '';
 $nombre = $ok ? ($_SESSION['nombre'] ?? '') : '';
 $rol = $ok ? ($_SESSION['rol'] ?? '') : '';
+$id = $ok ? (int)$_SESSION['user_id'] : 0;
+$usuario = $_SESSION['usuario'] ?? '';
+$nombre = $_SESSION['nombre'] ?? '';
+$rol = $_SESSION['rol'] ?? '';
 
 // Actualizar marca de actividad (heartbeat) cada vez que el cliente consulta auth_check (máx una vez cada 30s)
 if ($ok) {
