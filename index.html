@@ -72,12 +72,18 @@
                         </li>
                     </ul>
                 </li>
-                <!-- Nuevo módulo: Almacén -->
-                <li>
-                    <a href="#" data-mod="almacen" onclick="mostrarModulo('almacen')">
+                <li class="has-submenu">
+                    <a href="#" class="submenu-toggle" aria-haspopup="true" aria-expanded="false">
                         <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 7l9-4 9 4v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10h10M7 14h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
                         Almacén
+                        <span class="caret" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                     </a>
+                    <ul class="submenu">
+                        <li><a href="#" data-mod="almacen_moldes" onclick="mostrarModulo('almacen_moldes')">Moldes</a></li>
+                        <li><a href="#" data-mod="almacen_foco_productos" onclick="mostrarModulo('almacen_foco_productos')">Productos foco</a></li>
+                        <li><a href="#" data-mod="almacen_foco_metas" onclick="mostrarModulo('almacen_foco_metas')">Metas foco</a></li>
+                        <li><a href="#" data-mod="almacen_foco_avance" onclick="mostrarModulo('almacen_foco_avance')">Avance foco</a></li>
+                    </ul>
                 </li>
                 <li><a href="#" data-mod="cobranzas" onclick="mostrarModulo('cobranzas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 1a4 4 0 00-4 4v1H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a4 4 0 00-4-4zm-2 5V5a2 2 0 114 0v1h-4z"/></svg></span>Gestión de Cobranzas</a></li>
                 <li class="has-submenu">
@@ -293,13 +299,6 @@
     <section id="modulo-almacen" style="display:none;">
         <h2>Almacén</h2>
         <p style="color:#555;">Carga tu hoja de moldes (XLS/XLSX) para que el equipo de almacén pueda digitar el peso real. El mapeo <b>CÓDIGO→CAMIÓN</b> ahora se sube por separado y se guarda en su propia tabla.</p>
-        <div class="alm-subtabs" id="alm-subtabs">
-            <button type="button" class="alm-subtab is-active" data-alm-tab="moldes">Almacén: Moldes</button>
-            <button type="button" class="alm-subtab" data-alm-tab="foco-productos">Almacén: Productos foco</button>
-            <button type="button" class="alm-subtab" data-alm-tab="foco-metas">Almacén: Metas foco</button>
-            <button type="button" class="alm-subtab" data-alm-tab="foco-avance">Almacén: Avance foco</button>
-        </div>
-
         <div class="alm-panel" id="alm-panel-moldes">
             <form action="almacen_import.php" method="post" enctype="multipart/form-data" style="margin:10px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
                 <input type="hidden" name="action" value="moldes">
@@ -695,6 +694,7 @@
         </div>
     </section>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

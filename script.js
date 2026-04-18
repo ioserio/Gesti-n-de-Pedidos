@@ -151,6 +151,10 @@ const MODULE_PERMISSION_MAP = {
     'horarios':'horarios',
     'sesiones':'usuarios',
     'almacen':'almacen',
+    'almacen_moldes':'almacen',
+    'almacen_foco_productos':'almacen',
+    'almacen_foco_metas':'almacen',
+    'almacen_foco_avance':'almacen',
     'inicio': null
 };
 
@@ -174,8 +178,36 @@ const MODULE_TAB_META = {
     'permisos': { title: 'Permisos', closable: true },
     'sesiones': { title: 'Usuarios en línea', closable: true },
     'almacen': { title: 'Almacén', closable: true },
+    'almacen_moldes': { title: 'Almacén: Moldes', closable: true },
+    'almacen_foco_productos': { title: 'Almacén: Productos foco', closable: true },
+    'almacen_foco_metas': { title: 'Almacén: Metas foco', closable: true },
+    'almacen_foco_avance': { title: 'Almacén: Avance foco', closable: true },
     'horarios': { title: 'Horarios de Ingreso', closable: true }
 };
+
+const ALMACEN_MODULE_TO_TAB = {
+    almacen: 'moldes',
+    almacen_moldes: 'moldes',
+    almacen_foco_productos: 'foco-productos',
+    almacen_foco_metas: 'foco-metas',
+    almacen_foco_avance: 'foco-avance'
+};
+
+function isAlmacenModule(modulo) {
+    return Object.prototype.hasOwnProperty.call(ALMACEN_MODULE_TO_TAB, modulo);
+}
+
+function isModuleAllowed(modulo, permsSource) {
+    try {
+        if (!modulo || !MODULE_PERMISSION_MAP.hasOwnProperty(modulo)) return true;
+        const perm = MODULE_PERMISSION_MAP[modulo];
+        if (!perm) return true;
+        const perms = permsSource || window.__PERMS || {};
+        return perms[perm] !== false;
+    } catch (_) {
+        return true;
+    }
+}
 
 window.__openModuleTabs = window.__openModuleTabs || ['inicio'];
 window.__activeModuleTab = window.__activeModuleTab || 'inicio';
@@ -198,14 +230,7 @@ function normalizeOpenModuleTabs(tabs) {
 window.__openModuleTabs = normalizeOpenModuleTabs(window.__openModuleTabs);
 
 function canAccessModule(modulo) {
-    try {
-        if (!modulo || !MODULE_PERMISSION_MAP.hasOwnProperty(modulo)) return true;
-        const perm = MODULE_PERMISSION_MAP[modulo];
-        if (!perm) return true;
-        return !(window.__PERMS && window.__PERMS[perm] === false);
-    } catch (_) {
-        return true;
-    }
+    return isModuleAllowed(modulo, window.__PERMS);
 }
 
 function renderModuleTabs() {
@@ -366,6 +391,10 @@ function getModuleSection(modulo) {
         permisos: 'modulo-permisos',
         sesiones: 'modulo-sesiones',
         almacen: 'modulo-almacen',
+        almacen_moldes: 'modulo-almacen',
+        almacen_foco_productos: 'modulo-almacen',
+        almacen_foco_metas: 'modulo-almacen',
+        almacen_foco_avance: 'modulo-almacen',
         horarios: 'modulo-horarios'
     };
     const sectionId = sectionIdMap[modulo];
@@ -413,6 +442,9 @@ function restoreModuleState(modulo) {
 }
 
 function activateModuleContent(modulo) {
+    if (isAlmacenModule(modulo)) {
+        window.__almacenSubtab = ALMACEN_MODULE_TO_TAB[modulo] || 'moldes';
+    }
     const inicio = document.getElementById('modulo-inicio');
     if (inicio) inicio.style.display = (modulo === 'inicio') ? 'block' : 'none';
     document.getElementById('modulo-subir').style.display = (modulo === 'subir') ? 'block' : 'none';
@@ -452,7 +484,7 @@ function activateModuleContent(modulo) {
         const sesiones = document.getElementById('modulo-sesiones');
         if (sesiones) sesiones.style.display = (modulo === 'sesiones') ? 'block' : 'none';
         const almacen = document.getElementById('modulo-almacen');
-        if (almacen) almacen.style.display = (modulo === 'almacen') ? 'block' : 'none';
+        if (almacen) almacen.style.display = isAlmacenModule(modulo) ? 'block' : 'none';
         const horarios = document.getElementById('modulo-horarios');
         if (horarios) horarios.style.display = (modulo === 'horarios') ? 'block' : 'none';
         // Detener auto-refresh de sesiones al salir del módulo
@@ -543,7 +575,7 @@ function activateModuleContent(modulo) {
                 const ses = document.getElementById('modulo-sesiones');
                 if (ses && ses.style.display !== 'none') cargarSesiones();
             }, 30000);
-        } else if (modulo === 'almacen') {
+        } else if (isAlmacenModule(modulo)) {
             setTimeout(function(){ initAlmacen(); }, 50);
     }
     renderModuleTabs();
@@ -551,6 +583,16 @@ function activateModuleContent(modulo) {
 
 window.mostrarModulo = function(modulo) {
     openModuleTab(modulo || 'inicio');
+}
+
+window.mostrarAlmacenModulo = function(tab) {
+    const moduleByTab = {
+        'moldes': 'almacen_moldes',
+        'foco-productos': 'almacen_foco_productos',
+        'foco-metas': 'almacen_foco_metas',
+        'foco-avance': 'almacen_foco_avance'
+    };
+    openModuleTab(moduleByTab[tab] || 'almacen_moldes');
 }
 
 // Herramientas: inicialización y acciones
@@ -1325,13 +1367,138 @@ function cargarAlmacenFocoAvance(){
         .catch(() => { cont.innerHTML = '<p>Error al cargar el avance de productos foco.</p>'; });
 }
 
+function getAlmacenFocoReportElement(){
+    return document.querySelector('#alm-foco-avance-content .alm-foco-report');
+}
+
+function getAlmacenFocoCaptureElement(){
+    return document.querySelector('#alm-foco-avance-content .alm-foco-matrix-table')
+        || document.querySelector('#alm-foco-avance-content .alm-foco-matrix-wrap')
+        || getAlmacenFocoReportElement();
+}
+
+function ensureHtml2CanvasAvailable(){
+    if (typeof window.html2canvas === 'function') {
+        return Promise.resolve(window.html2canvas);
+    }
+    return new Promise(function(resolve, reject){
+        const existing = document.querySelector('script[data-html2canvas-loader="1"]');
+        if (existing) {
+            existing.addEventListener('load', function(){
+                if (typeof window.html2canvas === 'function') resolve(window.html2canvas);
+                else reject(new Error('html2canvas no disponible'));
+            }, { once: true });
+            existing.addEventListener('error', function(){ reject(new Error('No se pudo cargar html2canvas')); }, { once: true });
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+        script.async = true;
+        script.setAttribute('data-html2canvas-loader', '1');
+        script.onload = function(){
+            if (typeof window.html2canvas === 'function') resolve(window.html2canvas);
+            else reject(new Error('html2canvas no disponible'));
+        };
+        script.onerror = function(){ reject(new Error('No se pudo cargar html2canvas')); };
+        document.head.appendChild(script);
+    });
+}
+
+function canvasToBlob(canvas){
+    return new Promise(function(resolve, reject){
+        canvas.toBlob(function(blob){
+            if (blob) resolve(blob);
+            else reject(new Error('No se pudo generar la imagen'));
+        }, 'image/png');
+    });
+}
+
+async function captureAlmacenFocoReportBlob(){
+    const report = getAlmacenFocoReportElement();
+    const captureTarget = getAlmacenFocoCaptureElement();
+    if (!captureTarget) throw new Error('No hay reporte cargado');
+    const html2canvas = await ensureHtml2CanvasAvailable();
+    const body = document.body;
+    const wasDark = body.classList.contains('dark-theme');
+    if (report) report.classList.add('is-capture-mode');
+    captureTarget.classList.add('is-capture-mode');
+    try {
+        const canvas = await html2canvas(captureTarget, {
+            backgroundColor: wasDark ? '#0f1729' : '#f4f7fb',
+            scale: Math.max(2, window.devicePixelRatio || 1),
+            useCORS: true,
+            logging: false,
+            width: captureTarget.scrollWidth,
+            height: captureTarget.scrollHeight,
+            windowWidth: captureTarget.scrollWidth,
+            windowHeight: captureTarget.scrollHeight,
+            x: 0,
+            y: 0,
+            scrollX: 0,
+            scrollY: 0
+        });
+        return canvasToBlob(canvas);
+    } finally {
+        if (report) report.classList.remove('is-capture-mode');
+        captureTarget.classList.remove('is-capture-mode');
+    }
+}
+
+async function copyAlmacenFocoReportImage(){
+    try {
+        setAlmacenMessage('alm-foco-avance-msg', 'Generando imagen del reporte...', false);
+        const blob = await captureAlmacenFocoReportBlob();
+        if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            setAlmacenMessage('alm-foco-avance-msg', 'Imagen copiada. Ya puedes pegarla en WhatsApp.', false);
+            return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'avance-foco.png';
+        link.click();
+        URL.revokeObjectURL(url);
+        setAlmacenMessage('alm-foco-avance-msg', 'Tu navegador no permite copiar la imagen. Se descargó el PNG.', true);
+    } catch (err) {
+        setAlmacenMessage('alm-foco-avance-msg', 'No se pudo generar la imagen (' + (err.message || 'error') + ').', true);
+    }
+}
+
+async function shareAlmacenFocoReportToWhatsApp(){
+    try {
+        setAlmacenMessage('alm-foco-avance-msg', 'Preparando imagen para WhatsApp...', false);
+        const blob = await captureAlmacenFocoReportBlob();
+        const file = new File([blob], 'avance-foco.png', { type: 'image/png' });
+        if (navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: 'Avance foco',
+                text: 'Reporte de avance foco'
+            });
+            setAlmacenMessage('alm-foco-avance-msg', 'Imagen compartida correctamente.', false);
+            return;
+        }
+        if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'avance-foco.png';
+        link.click();
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+        window.open('https://web.whatsapp.com/', '_blank', 'noopener');
+        setAlmacenMessage('alm-foco-avance-msg', 'Se copió la imagen y se descargó el PNG. En WhatsApp pega la imagen o adjunta el archivo.', false);
+    } catch (err) {
+        setAlmacenMessage('alm-foco-avance-msg', 'No se pudo preparar la imagen para WhatsApp (' + (err.message || 'error') + ').', true);
+    }
+}
+
 function showAlmacenSubtab(tab){
     const valid = ['moldes', 'foco-productos', 'foco-metas', 'foco-avance'];
     if (!valid.includes(tab)) tab = 'moldes';
     window.__almacenSubtab = tab;
-    document.querySelectorAll('#alm-subtabs .alm-subtab').forEach(function(btn){
-        btn.classList.toggle('is-active', btn.getAttribute('data-alm-tab') === tab);
-    });
     const panels = {
         'moldes': document.getElementById('alm-panel-moldes'),
         'foco-productos': document.getElementById('alm-panel-foco-productos'),
@@ -1357,12 +1524,6 @@ function initAlmacen(){
                 form.__wired = true;
                 form.addEventListener('submit', function(e){ e.preventDefault(); cargarAlmacen(); });
         }
-        const tabs = document.querySelectorAll('#alm-subtabs .alm-subtab');
-        tabs.forEach(function(btn){
-            if (btn.__wired) return;
-            btn.__wired = true;
-            btn.addEventListener('click', function(){ showAlmacenSubtab(btn.getAttribute('data-alm-tab') || 'moldes'); });
-        });
 
         const productForm = document.getElementById('alm-foco-product-form');
         if (productForm && !productForm.__wired) {
@@ -2772,19 +2933,9 @@ document.addEventListener('click', function(e){
             try {
                 const currentId = window.__CURRENT_USER_ID || 0;
                 if (currentId && currentId === uid) {
-                    const anchors = document.querySelectorAll('a[data-mod="'+mod+'"]');
-                    anchors.forEach(a => {
-                        const allowed = !!val;
-                        a.classList.toggle('is-enabled', allowed);
-                        a.classList.toggle('is-disabled', !allowed);
-                        if (!allowed) { a.setAttribute('aria-disabled','true'); a.title='Sin permiso'; }
-                        else { a.removeAttribute('aria-disabled'); a.removeAttribute('title'); }
-                    });
-                    // Actualizar cache de permisos
                     if (!window.__PERMS) window.__PERMS = {};
                     window.__PERMS[mod] = !!val;
-                    // Recalcular padres
-                    recomputeParentDropdownStates();
+                    applyPermissionStyles(window.__PERMS);
                 }
             } catch(_){}
             // feedback sutil
@@ -2826,19 +2977,9 @@ document.addEventListener('click', function(e){
             try {
                 const currentId = window.__CURRENT_USER_ID || 0;
                 if (currentId && currentId === uid) {
-                    document.querySelectorAll('a[data-mod]').forEach(a => {
-                        const modKey = a.getAttribute('data-mod');
-                        const allowed = (mods.hasOwnProperty(modKey)) ? !!mods[modKey] : a.classList.contains('is-enabled');
-                        a.classList.toggle('is-enabled', allowed);
-                        a.classList.toggle('is-disabled', !allowed);
-                        if (!allowed) { a.setAttribute('aria-disabled','true'); a.title='Sin permiso'; }
-                        else { a.removeAttribute('aria-disabled'); a.removeAttribute('title'); }
-                    });
-                    // Actualizar cache global
                     if (!window.__PERMS) window.__PERMS = {};
                     Object.keys(mods).forEach(k => { window.__PERMS[k] = !!mods[k]; });
-                    // Recalcular padres
-                    recomputeParentDropdownStates();
+                    applyPermissionStyles(window.__PERMS);
                 }
             } catch(_){}
         })
@@ -2974,7 +3115,7 @@ function applyPermissionStyles(perms){
     // Marcar cada anchor de módulo
     document.querySelectorAll('a[data-mod]').forEach(a => {
         const mod = a.getAttribute('data-mod');
-        const allowed = !!perms[mod];
+        const allowed = isModuleAllowed(mod, perms);
         a.classList.toggle('is-enabled', allowed);
         a.classList.toggle('is-disabled', !allowed);
         if (!allowed) { a.setAttribute('aria-disabled','true'); a.title='Sin permiso'; }

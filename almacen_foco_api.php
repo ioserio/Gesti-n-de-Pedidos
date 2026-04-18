@@ -628,7 +628,11 @@ function foco_build_report(mysqli $mysqli, string $mode, string $selectedDate): 
     echo '<div class="alm-foco-report">';
     echo '<div class="alm-foco-report-head">';
     echo '<div><strong>' . foco_h($title) . '</strong><div class="alm-foco-report-sub">Rango: ' . foco_h($startDate) . ' a ' . foco_h($endDate) . '</div></div>';
+    echo '<div class="alm-foco-report-actions">';
+    echo '<button type="button" class="alm-foco-action-secondary" onclick="copyAlmacenFocoReportImage()">Copiar imagen</button>';
+    echo '<button type="button" class="alm-foco-action-secondary" onclick="shareAlmacenFocoReportToWhatsApp()">WhatsApp</button>';
     echo '<button type="button" onclick="window.print()">Imprimir</button>';
+    echo '</div>';
     echo '</div>';
 
     $displayProductTotals = [];
@@ -651,100 +655,72 @@ function foco_build_report(mysqli $mysqli, string $mode, string $selectedDate): 
     }
     uksort($displayProductTotals, 'strnatcmp');
 
-    echo '<div class="alm-foco-global-grid">';
-    foreach ($displayProductTotals as $productCode => $bucket) {
-        $clients = count($bucket['clients']);
-        $qty = (float)$bucket['qty'];
-        $meta = (float)$bucket['meta'];
-        $avance = $meta > 0 ? (($qty / $meta) * 100) : 0.0;
-        echo '<article class="alm-foco-global-card">';
-        echo '<h4>' . foco_h($productCode) . '</h4>';
-        echo '<div class="alm-foco-global-name">' . foco_h($bucket['product']['nombre_producto']) . '</div>';
-        echo '<div class="alm-foco-global-stats">';
-        echo '<span>Clientes <strong>' . number_format($clients, 0, '.', ',') . '</strong></span>';
-        echo '<span>Cantidad <strong>' . number_format($qty, 2, '.', ',') . '</strong></span>';
-        echo '<span>Meta <strong>' . number_format($meta, 2, '.', ',') . '</strong></span>';
-        echo '<span>Avance <strong>' . number_format($avance, 1, '.', ',') . '%</strong></span>';
-        echo '</div>';
-        echo '</article>';
-    }
-    echo '</div>';
-
     $mesaNames = array_keys($mesaData);
     natsort($mesaNames);
-    echo '<div class="alm-foco-products-stack">';
+    echo '<div class="alm-foco-matrix-wrap">';
+    echo '<table class="alm-foco-matrix-table">';
+    echo '<thead>';
+    echo '<tr>';
+    echo '<th class="alm-foco-sticky-col"></th>';
     foreach ($displayProductTotals as $productCode => $bucket) {
-        $product = $bucket['product'];
-        $globalClients = count($bucket['clients']);
-        $globalQty = (float)$bucket['qty'];
-        $globalMeta = (float)$bucket['meta'];
-        $globalAvance = $globalMeta > 0 ? (($globalQty / $globalMeta) * 100) : 0.0;
-        if ($globalQty <= 0 && $globalMeta <= 0) {
+        echo '<th colspan="2" class="alm-foco-matrix-product-name">' . foco_h($bucket['product']['nombre_producto']) . '</th>';
+    }
+    echo '</tr>';
+    echo '<tr>';
+    echo '<th class="alm-foco-sticky-col"></th>';
+    foreach ($displayProductTotals as $productCode => $bucket) {
+        echo '<th colspan="2" class="alm-foco-matrix-product-code">' . foco_h($productCode) . '</th>';
+    }
+    echo '</tr>';
+    echo '<tr>';
+    echo '<th class="alm-foco-sticky-col">VD</th>';
+    foreach ($displayProductTotals as $productCode => $bucket) {
+        echo '<th>Clientes</th><th>Cantidad</th>';
+    }
+    echo '</tr>';
+    echo '</thead>';
+    echo '<tbody>';
+    foreach ($mesaNames as $mesa) {
+        $mesaBucket = $mesaData[$mesa];
+        $vendorMap = $mesaBucket['vendors'] ?? [];
+        uksort($vendorMap, 'strnatcmp');
+        $hasVisibleData = false;
+        foreach ($displayProductTotals as $productCode => $bucket) {
+            $mesaProduct = $mesaBucket['products'][$productCode] ?? null;
+            if ($mesaProduct && ((float)$mesaProduct['qty'] > 0 || count($mesaProduct['clients']) > 0 || (float)$mesaProduct['meta'] > 0)) {
+                $hasVisibleData = true;
+                break;
+            }
+        }
+        if (!$hasVisibleData) {
             continue;
         }
-        echo '<section class="alm-foco-product-block">';
-        echo '<div class="alm-foco-product-block-head">';
-        echo '<div>';
-        echo '<div class="alm-foco-product-code">' . foco_h($productCode) . '</div>';
-        echo '<div class="alm-foco-product-name">' . foco_h($product['nombre_producto']) . '</div>';
-        echo '</div>';
-        echo '<div class="alm-foco-product-kpis alm-foco-product-kpis-global">';
-        echo '<span><b>Clientes</b><strong>' . number_format($globalClients, 0, '.', ',') . '</strong></span>';
-        echo '<span><b>Cantidad</b><strong>' . number_format($globalQty, 2, '.', ',') . '</strong></span>';
-        echo '<span><b>Meta</b><strong>' . number_format($globalMeta, 2, '.', ',') . '</strong></span>';
-        echo '<span><b>Avance</b><strong>' . number_format($globalAvance, 1, '.', ',') . '%</strong></span>';
-        echo '</div>';
-        echo '</div>';
-        echo '<div class="alm-foco-mesas-grid">';
-        foreach ($mesaNames as $mesa) {
-            $mesaBucket = $mesaData[$mesa];
-            $productBucket = $mesaBucket['products'][$productCode] ?? null;
-            if (!$productBucket) {
-                continue;
+        echo '<tr class="alm-foco-matrix-mesa-row"><th colspan="' . (1 + (count($displayProductTotals) * 2)) . '">MESA ' . foco_h(str_pad((string)$mesa, 3, '0', STR_PAD_LEFT)) . '</th></tr>';
+        foreach ($vendorMap as $vendorCode => $vendorBucket) {
+            echo '<tr>';
+            echo '<th class="alm-foco-sticky-col">' . foco_h($vendorCode) . '</th>';
+            foreach ($displayProductTotals as $productCode => $bucket) {
+                $vendorProduct = $vendorBucket['products'][$productCode] ?? null;
+                $vendorClients = $vendorProduct ? count($vendorProduct['clients']) : 0;
+                $vendorQty = $vendorProduct ? (float)$vendorProduct['qty'] : 0.0;
+                echo '<td>' . number_format($vendorClients, 0, '.', ',') . '</td>';
+                echo '<td>' . number_format($vendorQty, 2, '.', ',') . '</td>';
             }
-            $clients = count($productBucket['clients']);
-            $qty = (float)$productBucket['qty'];
-            $meta = (float)$productBucket['meta'];
-            $avance = $meta > 0 ? (($qty / $meta) * 100) : 0.0;
-            $vendorRows = [];
-            foreach ($mesaBucket['vendors'] as $vendorBucket) {
-                $vendorProductBucket = $vendorBucket['products'][$productCode] ?? null;
-                if (!$vendorProductBucket) {
-                    continue;
-                }
-                $vendorRows[] = [
-                    'label' => trim((string)$vendorBucket['vendor_code']) !== '' ? trim((string)$vendorBucket['vendor_code']) : '-',
-                    'clients' => count($vendorProductBucket['clients']),
-                    'qty' => (float)$vendorProductBucket['qty'],
-                ];
-            }
-            usort($vendorRows, function(array $left, array $right): int {
-                return strnatcmp($left['label'], $right['label']);
-            });
-            echo '<article class="alm-foco-mesa-block">';
-            echo '<div class="alm-foco-mesa-title">Mesa ' . foco_h($mesa) . '</div>';
-            echo '<div class="alm-foco-product-card">';
-            echo '<div class="alm-foco-product-kpis">';
-            echo '<span><b>Clientes</b><strong>' . number_format($clients, 0, '.', ',') . '</strong></span>';
-            echo '<span><b>Cantidad</b><strong>' . number_format($qty, 2, '.', ',') . '</strong></span>';
-            echo '<span><b>Meta</b><strong>' . number_format($meta, 2, '.', ',') . '</strong></span>';
-            echo '<span><b>Avance</b><strong>' . number_format($avance, 1, '.', ',') . '%</strong></span>';
-            echo '</div>';
-            echo '<table class="alm-foco-mini-table"><thead><tr><th>VD</th><th>Cliente</th><th>Cantidad</th></tr></thead><tbody>';
-            foreach ($vendorRows as $vendorRow) {
-                echo '<tr>';
-                echo '<td>' . foco_h($vendorRow['label']) . '</td>';
-                echo '<td>' . number_format($vendorRow['clients'], 0, '.', ',') . '</td>';
-                echo '<td>' . number_format((float)$vendorRow['qty'], 2, '.', ',') . '</td>';
-                echo '</tr>';
-            }
-            echo '</tbody><tfoot><tr><th>Total</th><th>' . number_format($clients, 0, '.', ',') . '</th><th>' . number_format($qty, 2, '.', ',') . '</th></tr></tfoot></table>';
-            echo '</div>';
-            echo '</article>';
+            echo '</tr>';
         }
-        echo '</div>';
-        echo '</section>';
+        echo '<tr class="alm-foco-matrix-total-row">';
+        echo '<th class="alm-foco-sticky-col">Totales</th>';
+        foreach ($displayProductTotals as $productCode => $bucket) {
+            $mesaProduct = $mesaBucket['products'][$productCode] ?? null;
+            $mesaClients = $mesaProduct ? count($mesaProduct['clients']) : 0;
+            $mesaQty = $mesaProduct ? (float)$mesaProduct['qty'] : 0.0;
+            echo '<td>' . number_format($mesaClients, 0, '.', ',') . '</td>';
+            echo '<td>' . number_format($mesaQty, 2, '.', ',') . '</td>';
+        }
+        echo '</tr>';
     }
+    echo '</tbody>';
+    echo '</table>';
     echo '</div>';
 
     echo '</div>';
