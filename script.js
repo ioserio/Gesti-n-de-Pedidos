@@ -155,6 +155,9 @@ const MODULE_PERMISSION_MAP = {
     'almacen_foco_productos':'almacen',
     'almacen_foco_metas':'almacen',
     'almacen_foco_avance':'almacen',
+    'almacen_cobertura_grupos':'almacen',
+    'almacen_cobertura_metas':'almacen',
+    'almacen_cobertura_avance':'almacen',
     'inicio': null
 };
 
@@ -182,6 +185,9 @@ const MODULE_TAB_META = {
     'almacen_foco_productos': { title: 'Almacén: Productos foco', closable: true },
     'almacen_foco_metas': { title: 'Almacén: Metas foco', closable: true },
     'almacen_foco_avance': { title: 'Almacén: Avance foco', closable: true },
+    'almacen_cobertura_grupos': { title: 'Almacén: Productos x Cobertura', closable: true },
+    'almacen_cobertura_metas': { title: 'Almacén: Metas cobertura', closable: true },
+    'almacen_cobertura_avance': { title: 'Almacén: Avance cobertura', closable: true },
     'horarios': { title: 'Horarios de Ingreso', closable: true }
 };
 
@@ -190,7 +196,10 @@ const ALMACEN_MODULE_TO_TAB = {
     almacen_moldes: 'moldes',
     almacen_foco_productos: 'foco-productos',
     almacen_foco_metas: 'foco-metas',
-    almacen_foco_avance: 'foco-avance'
+    almacen_foco_avance: 'foco-avance',
+    almacen_cobertura_grupos: 'cobertura-grupos',
+    almacen_cobertura_metas: 'cobertura-metas',
+    almacen_cobertura_avance: 'cobertura-avance'
 };
 
 function isAlmacenModule(modulo) {
@@ -395,6 +404,7 @@ function getModuleSection(modulo) {
         almacen_foco_productos: 'modulo-almacen',
         almacen_foco_metas: 'modulo-almacen',
         almacen_foco_avance: 'modulo-almacen',
+        almacen_cobertura_metas: 'modulo-almacen',
         horarios: 'modulo-horarios'
     };
     const sectionId = sectionIdMap[modulo];
@@ -590,7 +600,10 @@ window.mostrarAlmacenModulo = function(tab) {
         'moldes': 'almacen_moldes',
         'foco-productos': 'almacen_foco_productos',
         'foco-metas': 'almacen_foco_metas',
-        'foco-avance': 'almacen_foco_avance'
+        'foco-avance': 'almacen_foco_avance',
+        'cobertura-grupos': 'almacen_cobertura_grupos',
+        'cobertura-metas': 'almacen_cobertura_metas',
+        'cobertura-avance': 'almacen_cobertura_avance'
     };
     openModuleTab(moduleByTab[tab] || 'almacen_moldes');
 }
@@ -1219,10 +1232,15 @@ function setFechaHoyAlmacen(){
         const a4 = document.getElementById('alm_foco_desde'); if (a4 && !a4.value) a4.value = val;
         const a5 = document.getElementById('alm_foco_meta_desde'); if (a5 && !a5.value) a5.value = val;
         const a6 = document.getElementById('alm_foco_avance_fecha'); if (a6 && !a6.value) a6.value = val;
+        const a7 = document.getElementById('alm_cobertura_desde'); if (a7 && !a7.value) a7.value = val;
+        const a8 = document.getElementById('alm_cobertura_hasta'); if (a8 && !a8.value) a8.value = val;
+        const a9 = document.getElementById('alm_cobertura_avance_fecha'); if (a9 && !a9.value) a9.value = val;
+        const a10 = document.getElementById('alm_cobertura_meta_desde'); if (a10 && !a10.value) a10.value = val;
 }
 
 window.__almacenSubtab = window.__almacenSubtab || 'moldes';
 window.__almacenFocoOptions = window.__almacenFocoOptions || null;
+window.__almacenCoberturaOptions = window.__almacenCoberturaOptions || null;
 
 function setAlmacenMessage(targetId, message, isError){
     const el = document.getElementById(targetId);
@@ -1294,6 +1312,60 @@ function resetAlmacenMetaForm(){
     setFechaHoyAlmacen();
 }
 
+function resetAlmacenCoberturaGroupForm(){
+    const form = document.getElementById('alm-cobertura-group-form');
+    if (!form) return;
+    form.reset();
+    const id = document.getElementById('alm_cobertura_group_id'); if (id) id.value = '';
+    const active = document.getElementById('alm_cobertura_activo'); if (active) active.checked = true;
+    const submit = document.getElementById('alm-cobertura-group-submit'); if (submit) submit.textContent = 'Agregar grupo';
+    const cancel = document.getElementById('alm-cobertura-group-cancel'); if (cancel) cancel.style.display = 'none';
+    setFechaHoyAlmacen();
+}
+
+function resetAlmacenCoberturaMetaForm(){
+    const form = document.getElementById('alm-cobertura-meta-form');
+    if (!form) return;
+    form.reset();
+    const id = document.getElementById('alm_cobertura_meta_id'); if (id) id.value = '';
+    const active = document.getElementById('alm_cobertura_meta_activo'); if (active) active.value = '1';
+    const submit = document.getElementById('alm-cobertura-meta-submit'); if (submit) submit.textContent = 'Guardar metas de la mesa';
+    const cancel = document.getElementById('alm-cobertura-meta-cancel'); if (cancel) cancel.style.display = 'none';
+    renderAlmacenCoberturaMetaVendorRows('');
+    setFechaHoyAlmacen();
+}
+
+function renderAlmacenCoberturaMetaVendorRows(supervisorId, valueMap){
+    const host = document.getElementById('alm-cobertura-meta-vendors');
+    if (!host) return;
+    const data = window.__almacenCoberturaOptions || {};
+    const selectedId = supervisorId ? String(supervisorId) : '';
+    if (!selectedId) {
+        host.innerHTML = '<p class="alm-cobertura-meta-empty">Selecciona una mesa para mostrar sus vendedores.</p>';
+        return;
+    }
+    const vendors = (data.vendedores || []).filter(function(item){
+        return String(item.supervisor_id || '') === selectedId;
+    });
+    if (!vendors.length) {
+        host.innerHTML = '<p class="alm-cobertura-meta-empty">No hay vendedores asociados a esta mesa.</p>';
+        return;
+    }
+    const values = valueMap || {};
+    const escapeHtml = function(text){
+        return String(text || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
+    };
+    host.innerHTML = '<div class="alm-cobertura-meta-grid">' + vendors.map(function(item){
+        const vendorCode = String(item.codigo || '');
+        const current = values[vendorCode] || {};
+        return '<div class="alm-cobertura-meta-row" data-vendedor="' + escapeHtml(vendorCode) + '">'
+            + '<div class="alm-cobertura-meta-vendor-label">' + escapeHtml(vendorCode + ' - ' + String(item.nombre || '')) + '</div>'
+            + '<input type="hidden" class="alm-cobertura-meta-row-id" value="' + escapeHtml(current.id || '') + '">'
+            + '<input type="number" class="alm-cobertura-meta-row-input" min="0" step="0.01" placeholder="0.00" value="' + escapeHtml(current.meta || '') + '">'
+            + '</div>';
+    }).join('') + '</div>';
+}
+
 async function cargarAlmacenFocoOptions(forceReload){
     if (window.__almacenFocoOptions && !forceReload) return window.__almacenFocoOptions;
     const res = await fetch('almacen_foco_api.php?action=options', { headers: { 'Accept': 'application/json' } });
@@ -1327,6 +1399,60 @@ async function cargarAlmacenFocoOptions(forceReload){
             opts.push('<option value="' + item.id + '">' + String(item.label || '').replaceAll('<','&lt;') + '</option>');
         });
         supervisorSel.innerHTML = opts.join('');
+    }
+    return data;
+}
+
+async function cargarAlmacenCoberturaOptions(forceReload){
+    if (window.__almacenCoberturaOptions && !forceReload) return window.__almacenCoberturaOptions;
+    const res = await fetch('almacen_cobertura_api.php?action=options', { headers: { 'Accept': 'application/json' } });
+    const data = await res.json();
+    if (!data || data.ok !== true) throw new Error('No se pudieron cargar las opciones de cobertura');
+    window.__almacenCoberturaOptions = data;
+
+    const groupSel = document.getElementById('alm_cobertura_meta_grupo');
+    if (groupSel) {
+        const current = groupSel.value || '';
+        const opts = ['<option value="">Seleccione...</option>'];
+        (data.grupos || []).forEach(function(item){
+            opts.push('<option value="' + item.id + '">' + String(item.nombre || '').replaceAll('<','&lt;') + '</option>');
+        });
+        groupSel.innerHTML = opts.join('');
+        groupSel.value = current;
+    }
+
+    const mesaSel = document.getElementById('alm_cobertura_meta_supervisor');
+    if (mesaSel) {
+        const current = mesaSel.value || '';
+        const opts = ['<option value="">Seleccione...</option>'];
+        (data.supervisores || []).forEach(function(item){
+            opts.push('<option value="' + item.id + '">' + String(item.label || '').replaceAll('<','&lt;') + '</option>');
+        });
+        mesaSel.innerHTML = opts.join('');
+        mesaSel.value = current;
+        renderAlmacenCoberturaMetaVendorRows(mesaSel.value || '');
+    }
+
+    const supervisorSel = document.getElementById('alm_cobertura_avance_supervisor');
+    if (supervisorSel) {
+        const current = supervisorSel.value || '';
+        const opts = ['<option value="">Todos</option>'];
+        (data.supervisores || []).forEach(function(item){
+            opts.push('<option value="' + item.id + '">' + String(item.label || '').replaceAll('<','&lt;') + '</option>');
+        });
+        supervisorSel.innerHTML = opts.join('');
+        supervisorSel.value = current;
+    }
+
+    const avanceGroupSel = document.getElementById('alm_cobertura_avance_grupo');
+    if (avanceGroupSel) {
+        const current = avanceGroupSel.value || '';
+        const opts = ['<option value="">Todos</option>'];
+        (data.grupos || []).forEach(function(item){
+            opts.push('<option value="' + item.id + '">' + String(item.nombre || '').replaceAll('<','&lt;') + '</option>');
+        });
+        avanceGroupSel.innerHTML = opts.join('');
+        avanceGroupSel.value = current;
     }
     return data;
 }
@@ -1365,6 +1491,45 @@ function cargarAlmacenFocoAvance(){
         .then(r => r.text())
         .then(html => { cont.innerHTML = html; })
         .catch(() => { cont.innerHTML = '<p>Error al cargar el avance de productos foco.</p>'; });
+}
+
+function cargarAlmacenCoberturaGrupos(){
+    const cont = document.getElementById('alm-cobertura-group-list');
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando grupos de cobertura...</p>';
+    fetch('almacen_cobertura_api.php?action=groups_list')
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(() => { cont.innerHTML = '<p>Error al cargar grupos de cobertura.</p>'; });
+}
+
+    function cargarAlmacenCoberturaMetas(){
+        const cont = document.getElementById('alm-cobertura-meta-list');
+        if (!cont) return;
+        cont.innerHTML = '<p>Cargando metas de cobertura...</p>';
+        fetch('almacen_cobertura_api.php?action=metas_list')
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(() => { cont.innerHTML = '<p>Error al cargar metas de cobertura.</p>'; });
+    }
+
+function cargarAlmacenCoberturaAvance(){
+    const cont = document.getElementById('alm-cobertura-avance-content');
+    const fecha = document.getElementById('alm_cobertura_avance_fecha')?.value || new Date().toISOString().slice(0,10);
+    const groupId = document.getElementById('alm_cobertura_avance_grupo')?.value || '';
+    const supervisorId = document.getElementById('alm_cobertura_avance_supervisor')?.value || '';
+    if (!cont) return;
+    cont.innerHTML = '<p>Cargando avance de cobertura...</p>';
+    const qs = new URLSearchParams();
+    qs.set('action', 'avance');
+    qs.set('date', fecha);
+    qs.set('mode', 'day');
+    if (groupId) qs.set('group_id', groupId);
+    if (supervisorId) qs.set('supervisor_id', supervisorId);
+    fetch('almacen_cobertura_api.php?' + qs.toString())
+        .then(r => r.text())
+        .then(html => { cont.innerHTML = html; })
+        .catch(() => { cont.innerHTML = '<p>Error al cargar el avance de cobertura.</p>'; });
 }
 
 function getAlmacenFocoReportElement(){
@@ -1496,14 +1661,17 @@ async function shareAlmacenFocoReportToWhatsApp(){
 }
 
 function showAlmacenSubtab(tab){
-    const valid = ['moldes', 'foco-productos', 'foco-metas', 'foco-avance'];
+    const valid = ['moldes', 'foco-productos', 'foco-metas', 'foco-avance', 'cobertura-grupos', 'cobertura-metas', 'cobertura-avance'];
     if (!valid.includes(tab)) tab = 'moldes';
     window.__almacenSubtab = tab;
     const panels = {
         'moldes': document.getElementById('alm-panel-moldes'),
         'foco-productos': document.getElementById('alm-panel-foco-productos'),
         'foco-metas': document.getElementById('alm-panel-foco-metas'),
-        'foco-avance': document.getElementById('alm-panel-foco-avance')
+        'foco-avance': document.getElementById('alm-panel-foco-avance'),
+        'cobertura-grupos': document.getElementById('alm-panel-cobertura-grupos'),
+        'cobertura-metas': document.getElementById('alm-panel-cobertura-metas'),
+        'cobertura-avance': document.getElementById('alm-panel-cobertura-avance')
     };
     Object.keys(panels).forEach(function(key){
         if (panels[key]) panels[key].style.display = (key === tab) ? 'block' : 'none';
@@ -1515,6 +1683,15 @@ function showAlmacenSubtab(tab){
         cargarAlmacenFocoMetas();
     }
     if (tab === 'foco-avance') cargarAlmacenFocoAvance();
+    if (tab === 'cobertura-grupos') cargarAlmacenCoberturaGrupos();
+    if (tab === 'cobertura-metas') {
+        cargarAlmacenCoberturaOptions().catch(function(){});
+        cargarAlmacenCoberturaMetas();
+    }
+    if (tab === 'cobertura-avance') {
+        cargarAlmacenCoberturaOptions().catch(function(){});
+        cargarAlmacenCoberturaAvance();
+    }
 }
 
 function initAlmacen(){
@@ -1595,6 +1772,91 @@ function initAlmacen(){
         if (reportForm && !reportForm.__wired) {
             reportForm.__wired = true;
             reportForm.addEventListener('submit', function(e){ e.preventDefault(); cargarAlmacenFocoAvance(); });
+        }
+
+        const coberturaGroupForm = document.getElementById('alm-cobertura-group-form');
+        if (coberturaGroupForm && !coberturaGroupForm.__wired) {
+            coberturaGroupForm.__wired = true;
+            coberturaGroupForm.addEventListener('submit', function(e){
+                e.preventDefault();
+                const fd = new FormData(coberturaGroupForm);
+                fd.set('action', 'group_save');
+                fd.set('activo', document.getElementById('alm_cobertura_activo')?.checked ? '1' : '0');
+                setAlmacenMessage('alm-cobertura-group-msg', 'Guardando grupo de cobertura...', false);
+                fetch('almacen_cobertura_api.php', { method:'POST', body: fd, headers:{ 'Accept':'application/json' } })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data || data.ok !== true) throw new Error((data && (data.message || data.error)) || 'Error');
+                        setAlmacenMessage('alm-cobertura-group-msg', 'Grupo de cobertura guardado correctamente.', false);
+                        resetAlmacenCoberturaGroupForm();
+                        cargarAlmacenCoberturaGrupos();
+                    })
+                    .catch(err => setAlmacenMessage('alm-cobertura-group-msg', 'No se pudo guardar (' + (err.message || 'error') + ').', true));
+            });
+        }
+
+        const coberturaGroupCancel = document.getElementById('alm-cobertura-group-cancel');
+        if (coberturaGroupCancel && !coberturaGroupCancel.__wired) {
+            coberturaGroupCancel.__wired = true;
+            coberturaGroupCancel.addEventListener('click', function(){ resetAlmacenCoberturaGroupForm(); setAlmacenMessage('alm-cobertura-group-msg', '', false); });
+        }
+
+        const coberturaMetaForm = document.getElementById('alm-cobertura-meta-form');
+        if (coberturaMetaForm && !coberturaMetaForm.__wired) {
+            coberturaMetaForm.__wired = true;
+            coberturaMetaForm.addEventListener('submit', function(e){
+                e.preventDefault();
+                const groupId = document.getElementById('alm_cobertura_meta_grupo')?.value || '';
+                const supervisorId = document.getElementById('alm_cobertura_meta_supervisor')?.value || '';
+                const items = [];
+                document.querySelectorAll('#alm-cobertura-meta-vendors .alm-cobertura-meta-row').forEach(function(row){
+                    const cod = row.getAttribute('data-vendedor') || '';
+                    const meta = row.querySelector('.alm-cobertura-meta-row-input')?.value || '';
+                    const id = row.querySelector('.alm-cobertura-meta-row-id')?.value || '';
+                    if (!cod || meta === '') return;
+                    const metaNum = Number(meta);
+                    if (!Number.isFinite(metaNum) || metaNum <= 0) return;
+                    items.push({ cod: cod, meta: metaNum, id: id || '' });
+                });
+                if (!groupId || !supervisorId || !items.length) {
+                    setAlmacenMessage('alm-cobertura-meta-msg', 'Selecciona grupo, mesa y al menos una meta válida.', true);
+                    return;
+                }
+                const fd = new FormData(coberturaMetaForm);
+                fd.set('action', 'meta_bulk_save');
+                fd.set('items', JSON.stringify(items));
+                setAlmacenMessage('alm-cobertura-meta-msg', 'Guardando meta de cobertura...', false);
+                fetch('almacen_cobertura_api.php', { method:'POST', body: fd, headers:{ 'Accept':'application/json' } })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data || data.ok !== true) throw new Error((data && (data.message || data.error)) || 'Error');
+                        setAlmacenMessage('alm-cobertura-meta-msg', 'Metas de cobertura guardadas correctamente.', false);
+                        resetAlmacenCoberturaMetaForm();
+                        cargarAlmacenCoberturaMetas();
+                        cargarAlmacenCoberturaGrupos();
+                    })
+                    .catch(err => setAlmacenMessage('alm-cobertura-meta-msg', 'No se pudo guardar (' + (err.message || 'error') + ').', true));
+            });
+        }
+
+        const coberturaMetaCancel = document.getElementById('alm-cobertura-meta-cancel');
+        if (coberturaMetaCancel && !coberturaMetaCancel.__wired) {
+            coberturaMetaCancel.__wired = true;
+            coberturaMetaCancel.addEventListener('click', function(){ resetAlmacenCoberturaMetaForm(); setAlmacenMessage('alm-cobertura-meta-msg', '', false); });
+        }
+
+        const coberturaMetaMesa = document.getElementById('alm_cobertura_meta_supervisor');
+        if (coberturaMetaMesa && !coberturaMetaMesa.__wired) {
+            coberturaMetaMesa.__wired = true;
+            coberturaMetaMesa.addEventListener('change', function(){
+                renderAlmacenCoberturaMetaVendorRows(coberturaMetaMesa.value || '');
+            });
+        }
+
+        const coberturaReportForm = document.getElementById('alm-cobertura-avance-form');
+        if (coberturaReportForm && !coberturaReportForm.__wired) {
+            coberturaReportForm.__wired = true;
+            coberturaReportForm.addEventListener('submit', function(e){ e.preventDefault(); cargarAlmacenCoberturaAvance(); });
         }
 
         const productList = document.getElementById('alm-foco-product-list');
@@ -1679,7 +1941,93 @@ function initAlmacen(){
             });
         }
 
+        const coberturaGroupList = document.getElementById('alm-cobertura-group-list');
+        if (coberturaGroupList && !coberturaGroupList.__wired) {
+            coberturaGroupList.__wired = true;
+            coberturaGroupList.addEventListener('click', function(e){
+                const btnEdit = e.target.closest('.alm-cobertura-group-edit');
+                if (btnEdit) {
+                    document.getElementById('alm_cobertura_group_id').value = btnEdit.getAttribute('data-id') || '';
+                    document.getElementById('alm_cobertura_nombre').value = btnEdit.getAttribute('data-nombre') || '';
+                    document.getElementById('alm_cobertura_desde').value = btnEdit.getAttribute('data-desde') || '';
+                    document.getElementById('alm_cobertura_hasta').value = btnEdit.getAttribute('data-hasta') || '';
+                    document.getElementById('alm_cobertura_codigos').value = btnEdit.getAttribute('data-codigos') || '';
+                    document.getElementById('alm_cobertura_observacion').value = btnEdit.getAttribute('data-observacion') || '';
+                    document.getElementById('alm_cobertura_activo').checked = (btnEdit.getAttribute('data-activo') || '1') === '1';
+                    const submit = document.getElementById('alm-cobertura-group-submit'); if (submit) submit.textContent = 'Guardar cambios';
+                    const cancel = document.getElementById('alm-cobertura-group-cancel'); if (cancel) cancel.style.display = 'inline-block';
+                    setAlmacenMessage('alm-cobertura-group-msg', 'Modo edición activo.', false);
+                    return;
+                }
+                const btnDelete = e.target.closest('.alm-cobertura-group-delete');
+                if (btnDelete) {
+                    const id = btnDelete.getAttribute('data-id') || '';
+                    if (!id || !confirm('¿Eliminar este grupo de cobertura?')) return;
+                    const fd = new FormData();
+                    fd.append('action', 'group_delete');
+                    fd.append('id', id);
+                    fetch('almacen_cobertura_api.php', { method:'POST', body: fd, headers:{ 'Accept':'application/json' } })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (!data || data.ok !== true) throw new Error((data && (data.message || data.error)) || 'Error');
+                            setAlmacenMessage('alm-cobertura-group-msg', 'Grupo de cobertura eliminado.', false);
+                            resetAlmacenCoberturaGroupForm();
+                            cargarAlmacenCoberturaGrupos();
+                        })
+                        .catch(err => setAlmacenMessage('alm-cobertura-group-msg', 'No se pudo eliminar (' + (err.message || 'error') + ').', true));
+                }
+            });
+        }
+
+        const coberturaMetaList = document.getElementById('alm-cobertura-meta-list');
+        if (coberturaMetaList && !coberturaMetaList.__wired) {
+            coberturaMetaList.__wired = true;
+            coberturaMetaList.addEventListener('click', function(e){
+                const btnEdit = e.target.closest('.alm-cobertura-meta-edit');
+                if (btnEdit) {
+                    cargarAlmacenCoberturaOptions().then(function(){
+                        document.getElementById('alm_cobertura_meta_id').value = btnEdit.getAttribute('data-id') || '';
+                        document.getElementById('alm_cobertura_meta_grupo').value = btnEdit.getAttribute('data-grupo-id') || '';
+                        document.getElementById('alm_cobertura_meta_supervisor').value = btnEdit.getAttribute('data-supervisor-id') || '';
+                        document.getElementById('alm_cobertura_meta_desde').value = btnEdit.getAttribute('data-desde') || '';
+                        document.getElementById('alm_cobertura_meta_hasta').value = btnEdit.getAttribute('data-hasta') || '';
+                        document.getElementById('alm_cobertura_meta_activo').value = btnEdit.getAttribute('data-activo') || '1';
+                        document.getElementById('alm_cobertura_meta_observacion').value = btnEdit.getAttribute('data-observacion') || '';
+                        const valueMap = {};
+                        valueMap[btnEdit.getAttribute('data-vendedor') || ''] = {
+                            id: btnEdit.getAttribute('data-id') || '',
+                            meta: btnEdit.getAttribute('data-meta') || ''
+                        };
+                        renderAlmacenCoberturaMetaVendorRows(document.getElementById('alm_cobertura_meta_supervisor').value || '', valueMap);
+                        const submit = document.getElementById('alm-cobertura-meta-submit'); if (submit) submit.textContent = 'Guardar cambios de la mesa';
+                        const cancel = document.getElementById('alm-cobertura-meta-cancel'); if (cancel) cancel.style.display = 'inline-block';
+                        setAlmacenMessage('alm-cobertura-meta-msg', 'Modo edición activo.', false);
+                    }).catch(function(){});
+                    return;
+                }
+                const btnDelete = e.target.closest('.alm-cobertura-meta-delete');
+                if (btnDelete) {
+                    const id = btnDelete.getAttribute('data-id') || '';
+                    if (!id || !confirm('¿Eliminar esta meta de cobertura?')) return;
+                    const fd = new FormData();
+                    fd.append('action', 'meta_delete');
+                    fd.append('id', id);
+                    fetch('almacen_cobertura_api.php', { method:'POST', body: fd, headers:{ 'Accept':'application/json' } })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (!data || data.ok !== true) throw new Error((data && (data.message || data.error)) || 'Error');
+                            setAlmacenMessage('alm-cobertura-meta-msg', 'Meta de cobertura eliminada.', false);
+                            resetAlmacenCoberturaMetaForm();
+                            cargarAlmacenCoberturaMetas();
+                            cargarAlmacenCoberturaGrupos();
+                        })
+                        .catch(err => setAlmacenMessage('alm-cobertura-meta-msg', 'No se pudo eliminar (' + (err.message || 'error') + ').', true));
+                }
+            });
+        }
+
         cargarAlmacenFocoOptions().catch(function(){});
+        cargarAlmacenCoberturaOptions().catch(function(){});
         showAlmacenSubtab(window.__almacenSubtab || 'moldes');
 }
 function cargarAlmacen(){

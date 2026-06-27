@@ -3,7 +3,7 @@
 // Zona horaria de la app (Perú)
 @date_default_timezone_set('America/Lima');
 
-$mysqli = new mysqli('sql306.infinityfree.com', 'if0_39093659', '923486317', 'if0_39093659_c_pedidos');
+$mysqli = new mysqli('sql306.infinityfree.com', 'if0_39093659', '9234dre86317', 'if0_39093659_c_pedidos');
 if ($mysqli->connect_errno) {
     die('Error de conexión a la base de datos: ' . $mysqli->connect_error);
 }

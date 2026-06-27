@@ -83,6 +83,9 @@
                         <li><a href="#" data-mod="almacen_foco_productos" onclick="mostrarModulo('almacen_foco_productos')">Productos foco</a></li>
                         <li><a href="#" data-mod="almacen_foco_metas" onclick="mostrarModulo('almacen_foco_metas')">Metas foco</a></li>
                         <li><a href="#" data-mod="almacen_foco_avance" onclick="mostrarModulo('almacen_foco_avance')">Avance foco</a></li>
+                        <li><a href="#" data-mod="almacen_cobertura_grupos" onclick="mostrarModulo('almacen_cobertura_grupos')">Productos x Cobertura</a></li>
+                        <li><a href="#" data-mod="almacen_cobertura_metas" onclick="mostrarModulo('almacen_cobertura_metas')">Metas cobertura</a></li>
+                        <li><a href="#" data-mod="almacen_cobertura_avance" onclick="mostrarModulo('almacen_cobertura_avance')">Avance cobertura</a></li>
                     </ul>
                 </li>
                 <li><a href="#" data-mod="cobranzas" onclick="mostrarModulo('cobranzas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 1a4 4 0 00-4 4v1H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a4 4 0 00-4-4zm-2 5V5a2 2 0 114 0v1h-4z"/></svg></span>Gestión de Cobranzas</a></li>
@@ -225,6 +228,20 @@
             <button type="submit" style="margin-left:14px;">Subir Cubo de Ventas</button>
         </form>
         <p style="font-size:12px; color:#666; margin-top:8px;">Si no marcas la casilla, solo se borran los registros de las fechas encontradas en el archivo que estás subiendo.</p>
+
+        <hr style="margin:24px 0;">
+
+        <h2>Subir Excel de Comprobantes Detallados</h2>
+        <p>Selecciona tu archivo <b>CUBO DE VENTAS - DETALLADO-3-4TAPARTE.xlsx</b> para cargarlo en la tabla <code>comprobantes_detallados</code>. El sistema detecta las fechas del archivo y reemplaza los registros existentes de esas mismas fechas, salvo que marques la opción para vaciar toda la tabla.</p>
+        <form action="procesar_comprobantes_detallados.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
+            <input type="file" name="archivo_comprobantes_detallados" accept=".xlsx,.xls" required>
+            <label style="margin-left:14px; display:inline-flex; align-items:center; gap:6px;">
+                <input type="checkbox" name="truncate" value="1">
+                Vaciar tabla antes de importar
+            </label>
+            <button type="submit" style="margin-left:14px;">Subir Comprobantes Detallados</button>
+        </form>
+        <p style="font-size:12px; color:#666; margin-top:8px;">Si no marcas la casilla, solo se reemplazan los registros de las fechas detectadas en el archivo.</p>
     </section>
     <section id="modulo-consultar" style="display:none;">
         <h2>Consultar Pedidos por Vendedor</h2>
@@ -397,6 +414,89 @@
                 </form>
                 <div id="alm-foco-avance-msg" class="alm-focus-msg"></div>
                 <div id="alm-foco-avance-content"></div>
+            </div>
+        </div>
+
+        <div class="alm-panel" id="alm-panel-cobertura-grupos" style="display:none;">
+            <div class="alm-focus-card">
+                <h3>Productos x Cobertura</h3>
+                <p>Crea grupos de códigos de producto con una vigencia definida. Las metas se registran por vendedor en la pestaña de metas.</p>
+                <form id="alm-cobertura-group-form" class="alm-focus-form">
+                    <input type="hidden" id="alm_cobertura_group_id" name="id">
+                    <div class="alm-focus-form-grid">
+                        <label>Nombre del grupo <input type="text" id="alm_cobertura_nombre" name="nombre_grupo" placeholder="Ej: Cobertura Gaseosas 2L" required></label>
+                        <label>Desde <input type="date" id="alm_cobertura_desde" name="fecha_inicio" required></label>
+                        <label>Hasta <input type="date" id="alm_cobertura_hasta" name="fecha_fin" required></label>
+                        <label class="alm-focus-form-wide">Códigos de producto
+                            <textarea id="alm_cobertura_codigos" name="codigos" rows="4" placeholder="Ingresa códigos separados por coma, espacio o salto de línea" required></textarea>
+                        </label>
+                        <label class="alm-focus-form-wide">Observación <input type="text" id="alm_cobertura_observacion" name="observacion" placeholder="Campaña de verano, cobertura zona norte"></label>
+                        <label class="alm-focus-check"><input type="checkbox" id="alm_cobertura_activo" name="activo" checked> Activo</label>
+                    </div>
+                    <div class="alm-focus-actions">
+                        <button type="submit" id="alm-cobertura-group-submit">Agregar grupo</button>
+                        <button type="button" id="alm-cobertura-group-cancel" style="display:none; background:#6c757d;">Cancelar edición</button>
+                    </div>
+                </form>
+                <div id="alm-cobertura-group-msg" class="alm-focus-msg"></div>
+                <div id="alm-cobertura-group-list"></div>
+            </div>
+        </div>
+
+        <div class="alm-panel" id="alm-panel-cobertura-metas" style="display:none;">
+            <div class="alm-focus-card">
+                <h3>Metas de cobertura</h3>
+                <p>Selecciona una mesa para cargar todos sus vendedores y asignarles metas en un solo paso.</p>
+                <form id="alm-cobertura-meta-form" class="alm-focus-form">
+                    <input type="hidden" id="alm_cobertura_meta_id" name="id">
+                    <div class="alm-focus-form-grid">
+                        <label>Grupo
+                            <select id="alm_cobertura_meta_grupo" name="grupo_id" required></select>
+                        </label>
+                        <label>Mesa
+                            <select id="alm_cobertura_meta_supervisor" name="supervisor_id" required></select>
+                        </label>
+                        <label>Desde <input type="date" id="alm_cobertura_meta_desde" name="fecha_inicio"></label>
+                        <label>Hasta <input type="date" id="alm_cobertura_meta_hasta" name="fecha_fin"></label>
+                        <label>Activo
+                            <select id="alm_cobertura_meta_activo" name="activo">
+                                <option value="1">Sí</option>
+                                <option value="0">No</option>
+                            </select>
+                        </label>
+                        <label class="alm-focus-form-wide">Observación <input type="text" id="alm_cobertura_meta_observacion" name="observacion" placeholder="Meta mensual por vendedor"></label>
+                    </div>
+                    <div id="alm-cobertura-meta-vendors" class="alm-cobertura-meta-vendors"></div>
+                    <div class="alm-focus-actions">
+                        <button type="submit" id="alm-cobertura-meta-submit">Guardar metas de la mesa</button>
+                        <button type="button" id="alm-cobertura-meta-cancel" style="display:none; background:#6c757d;">Cancelar edición</button>
+                    </div>
+                </form>
+                <div id="alm-cobertura-meta-msg" class="alm-focus-msg"></div>
+                <div id="alm-cobertura-meta-list"></div>
+            </div>
+        </div>
+
+        <div class="alm-panel" id="alm-panel-cobertura-avance" style="display:none;">
+            <div class="alm-focus-card">
+                <h3>Avance de cobertura</h3>
+                <p>Consulta el avance diario por mesa usando la tabla <code>comprobantes_detallados</code>.</p>
+                <form id="alm-cobertura-avance-form" class="alm-focus-form alm-focus-form-inline">
+                    <label>Fecha <input type="date" id="alm_cobertura_avance_fecha" name="date" required></label>
+                    <label>Grupo
+                        <select id="alm_cobertura_avance_grupo" name="grupo_id">
+                            <option value="">Todos</option>
+                        </select>
+                    </label>
+                    <label>Mesa
+                        <select id="alm_cobertura_avance_supervisor" name="supervisor_id">
+                            <option value="">Todos</option>
+                        </select>
+                    </label>
+                    <button type="submit">Ver avance</button>
+                </form>
+                <div id="alm-cobertura-avance-msg" class="alm-focus-msg"></div>
+                <div id="alm-cobertura-avance-content"></div>
             </div>
         </div>
     </section>

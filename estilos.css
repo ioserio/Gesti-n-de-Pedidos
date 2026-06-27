@@ -645,10 +645,16 @@ body.is-mobile .mobile-nav-toggle { display:inline-block !important; }
 
 .alm-focus-form-grid input,
 .alm-focus-form-grid select,
+.alm-focus-form-grid textarea,
 .alm-focus-form-inline input,
 .alm-focus-form-inline select {
     width:100%;
     box-sizing:border-box;
+}
+
+.alm-focus-form-grid textarea {
+    min-height:96px;
+    resize:vertical;
 }
 
 .alm-focus-form-wide {
@@ -692,6 +698,90 @@ body.is-mobile .mobile-nav-toggle { display:inline-block !important; }
 .alm-foco-table {
     width:100%;
     border-collapse:collapse;
+}
+
+.alm-cobertura-codes {
+    max-width:320px;
+    white-space:pre-wrap;
+    line-height:1.45;
+}
+
+.alm-cobertura-meta-vendors {
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+
+.alm-cobertura-meta-empty {
+    margin:0;
+    color:#6b778a;
+}
+
+.alm-cobertura-meta-grid {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:10px 14px;
+}
+
+.alm-cobertura-meta-row {
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) 120px;
+    gap:10px;
+    align-items:center;
+    padding:10px 12px;
+    border:1px solid #dde6f3;
+    border-radius:12px;
+    background:#fff;
+}
+
+.alm-cobertura-meta-vendor-label {
+    font-weight:700;
+    color:#2d3748;
+}
+
+.alm-cobertura-day-card {
+    margin-top:14px;
+    border:1px solid rgba(137, 170, 219, 0.18);
+    border-radius:16px;
+    overflow:hidden;
+    background:rgba(10, 18, 32, 0.2);
+}
+
+.alm-cobertura-day-card-head {
+    padding:12px 14px;
+    border-bottom:1px solid rgba(137, 170, 219, 0.18);
+}
+
+.alm-cobertura-day-title {
+    font-size:24px;
+    font-weight:800;
+    color:#f4f7ff;
+}
+
+.alm-cobertura-day-table {
+    margin:0;
+}
+
+.alm-cobertura-day-table tfoot th {
+    font-weight:800;
+}
+
+.alm-cobertura-day-pct {
+    color:#d92d20;
+    font-weight:800;
+}
+
+.alm-cobertura-day-mesa-row th {
+    background:rgba(108,192,255,0.14);
+    color:#f4f7ff;
+    text-align:left;
+    font-size:14px;
+}
+
+.alm-cobertura-day-subtotal-row th,
+.alm-cobertura-day-subtotal-row td {
+    background:rgba(108,192,255,0.08);
+    font-weight:800;
 }
 
 .alm-foco-report {
