@@ -559,6 +559,7 @@ function cobertura_build_report(mysqli $mysqli, string $mode, string $selectedDa
 
         $qtyByGroupMesaVendor = [];
         $monthSeenClientsByGroup = [];
+        $monthSeenClientsBeforeDateByGroup = [];
 
     $groupsByCode = [];
     foreach ($groupCodes as $groupId => $items) {
@@ -682,6 +683,15 @@ function cobertura_build_report(mysqli $mysqli, string $mode, string $selectedDa
                             'mesa' => $mesaKey,
                             'vendor' => $vendorCode,
                         ];
+                        if ($rowDate < $date) {
+                            if (!isset($monthSeenClientsBeforeDateByGroup[$groupId])) {
+                                $monthSeenClientsBeforeDateByGroup[$groupId] = [];
+                            }
+                            if (!isset($monthSeenClientsBeforeDateByGroup[$groupId][$vendorCode])) {
+                                $monthSeenClientsBeforeDateByGroup[$groupId][$vendorCode] = [];
+                            }
+                            $monthSeenClientsBeforeDateByGroup[$groupId][$vendorCode][$clientCode] = true;
+                        }
                         $qtyByGroupMesaVendor[$groupId][$mesaKey][$vendorCode]['month_clients'][$clientCode] = true;
                     }
                 }
@@ -709,6 +719,9 @@ function cobertura_build_report(mysqli $mysqli, string $mode, string $selectedDa
         }
         foreach ($groupsByCode[$code] as $groupId) {
             if ($clientCode === '') {
+                continue;
+            }
+            if (isset($monthSeenClientsBeforeDateByGroup[$groupId][$vendorCode][$clientCode])) {
                 continue;
             }
             $mesaKey = $vendorSupervisorId !== null ? (int)$vendorSupervisorId : 0;
