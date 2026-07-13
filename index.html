@@ -242,6 +242,20 @@
             <button type="submit" style="margin-left:14px;">Subir Comprobantes Detallados</button>
         </form>
         <p style="font-size:12px; color:#666; margin-top:8px;">Si no marcas la casilla, solo se reemplazan los registros de las fechas detectadas en el archivo.</p>
+
+        <hr style="margin:24px 0;">
+
+        <h2>Subir Excel de Productos</h2>
+        <p>Selecciona tu archivo de productos para cargarlo en la tabla <code>codigo_productos</code>. El sistema actualiza por <code>codigo</code> y crea nuevos registros cuando no existen. Si marcas la opción, vacía toda la tabla antes de importar.</p>
+        <form action="procesar_codigo_productos.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
+            <input type="file" name="archivo_codigo_productos" accept=".xlsx,.xls" required>
+            <label style="margin-left:14px; display:inline-flex; align-items:center; gap:6px;">
+                <input type="checkbox" name="truncate" value="1">
+                Vaciar tabla antes de importar
+            </label>
+            <button type="submit" style="margin-left:14px;">Subir Productos</button>
+        </form>
+        <p style="font-size:12px; color:#666; margin-top:8px;">Columnas mínimas esperadas: <code>codigo</code> y <code>producto</code>. El importador también reconoce alias cercanos para el resto de campos de <code>codigo_productos</code>.</p>
     </section>
     <section id="modulo-consultar" style="display:none;">
         <h2>Consultar Pedidos por Vendedor</h2>
