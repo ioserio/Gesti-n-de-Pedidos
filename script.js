@@ -426,6 +426,10 @@ function saveModuleState(modulo) {
     if (modulo === 'seguimiento') {
         state.__sortPrev = window.__seguimientoSortPrev || '';
         state.__sortLast = window.__seguimientoSortLast || '';
+        state.__sortAvance = window.__seguimientoSortAvance || '';
+        state.__sortOrder = window.__seguimientoSortOrder || [];
+        state.__visibleVendors = Array.isArray(window.__seguimientoVisibleVendors) ? window.__seguimientoVisibleVendors.slice() : null;
+        state.__vendorFilterOpen = !!window.__seguimientoVendorFilterOpen;
     }
     window.__moduleTabState[modulo] = state;
 }
@@ -435,7 +439,7 @@ function restoreModuleState(modulo) {
     const state = window.__moduleTabState[modulo];
     if (!section || !state) return;
     Object.keys(state).forEach(function(key) {
-        if (key === '__sortPrev' || key === '__sortLast') return;
+        if (key === '__sortPrev' || key === '__sortLast' || key === '__sortAvance' || key === '__sortOrder' || key === '__visibleVendors' || key === '__vendorFilterOpen') return;
         let field = document.getElementById(key);
         if (field && !section.contains(field)) field = null;
         if (!field) {
@@ -448,6 +452,10 @@ function restoreModuleState(modulo) {
     if (modulo === 'seguimiento') {
         window.__seguimientoSortPrev = state.__sortPrev || '';
         window.__seguimientoSortLast = state.__sortLast || '';
+        window.__seguimientoSortAvance = state.__sortAvance || '';
+        window.__seguimientoSortOrder = Array.isArray(state.__sortOrder) ? state.__sortOrder : [];
+        window.__seguimientoVisibleVendors = Array.isArray(state.__visibleVendors) ? state.__visibleVendors.slice() : null;
+        window.__seguimientoVendorFilterOpen = !!state.__vendorFilterOpen;
     }
 }
 
@@ -526,7 +534,9 @@ function activateModuleContent(modulo) {
             const f = document.getElementById('fecha_seguimiento');
             if (f && f.value) cargarSeguimiento(f.value, {
                 sortPrev: window.__seguimientoSortPrev || '',
-                sortLast: window.__seguimientoSortLast || ''
+                sortLast: window.__seguimientoSortLast || '',
+                sortAvance: window.__seguimientoSortAvance || '',
+                sortOrder: window.__seguimientoSortOrder || []
             });
         }, 100);
     } else if (modulo === 'admin') {
@@ -1034,6 +1044,81 @@ function initResumenDashboardInteractions() {
     });
 }
 
+function siguienteOrdenSeguimiento(key, direction){
+    const state = {
+        sortPrev: window.__seguimientoSortPrev || '',
+        sortLast: window.__seguimientoSortLast || '',
+        sortAvance: window.__seguimientoSortAvance || ''
+    };
+    const field = { prev: 'sortPrev', last: 'sortLast', avance: 'sortAvance' }[key];
+    state[field] = direction;
+    const previous = Array.isArray(window.__seguimientoSortOrder) ? window.__seguimientoSortOrder : [];
+    state.sortOrder = previous.filter(function(item){ return item !== key; });
+    if (direction) state.sortOrder.unshift(key);
+    return state;
+}
+
+function iniciarFiltroVendedoresSeguimiento(cont){
+    const filter = cont.querySelector('.seg-vendor-filter');
+    if (!filter) return;
+    const choices = Array.from(filter.querySelectorAll('[data-seg-vendor-choice]'));
+    const available = choices.map(function(choice){ return choice.value; });
+    const summary = filter.querySelector('summary');
+    filter.open = !!window.__seguimientoVendorFilterOpen;
+    filter.addEventListener('toggle', function(){ window.__seguimientoVendorFilterOpen = filter.open; });
+
+    function apply(){
+        const selected = Array.isArray(window.__seguimientoVisibleVendors)
+            ? new Set(window.__seguimientoVisibleVendors) : null;
+        choices.forEach(function(choice){ choice.checked = selected === null || selected.has(choice.value); });
+        let visibleRows = 0;
+        cont.querySelectorAll('.seg-desktop [data-seg-vendor-row]').forEach(function(row){
+            const visible = selected === null || selected.has(row.getAttribute('data-seg-vendor-row'));
+            row.classList.toggle('seg-vendor-hidden', !visible);
+            if (visible) visibleRows++;
+        });
+        cont.querySelectorAll('.seg-mobile [data-seg-vendor-row]').forEach(function(row){
+            row.classList.toggle('seg-vendor-hidden', selected !== null && !selected.has(row.getAttribute('data-seg-vendor-row')));
+        });
+        const empty = cont.querySelector('[data-seg-vendor-empty]');
+        if (empty) empty.classList.toggle('seg-vendor-hidden', visibleRows !== 0);
+        const count = choices.filter(function(choice){ return choice.checked; }).length;
+        summary.textContent = count === available.length ? 'Vendedores: todos' : 'Vendedores: ' + count + ' de ' + available.length;
+    }
+
+    choices.forEach(function(choice){
+        choice.addEventListener('change', function(){
+            const selected = Array.isArray(window.__seguimientoVisibleVendors)
+                ? new Set(window.__seguimientoVisibleVendors) : new Set(available);
+            if (choice.checked) selected.add(choice.value);
+            else selected.delete(choice.value);
+            window.__seguimientoVisibleVendors = available.every(function(code){ return selected.has(code); })
+                ? null : Array.from(selected);
+            apply();
+        });
+    });
+    filter.querySelector('[data-seg-vendors-all]').addEventListener('click', function(){
+        window.__seguimientoVisibleVendors = null;
+        apply();
+    });
+    filter.querySelector('[data-seg-vendors-none]').addEventListener('click', function(){
+        window.__seguimientoVisibleVendors = [];
+        apply();
+    });
+    apply();
+}
+
+function actualizarIngresoSeguimiento(){
+    const checkbox = document.getElementById('mostrar_ingreso_seguimiento');
+    const cont = document.getElementById('seguimiento');
+    if (!checkbox || !cont) return;
+    const visible = checkbox.checked;
+    cont.classList.toggle('seg-ingreso-oculto', !visible);
+    const title = cont.querySelector('[data-seg-table-title]');
+    if (title) title.colSpan = visible ? 11 : 8;
+    cont.querySelectorAll('[data-seg-rowspan]').forEach(function(cell){ cell.rowSpan = visible ? 2 : 1; });
+}
+
 // Cargar seguimiento por rangos horarios
 function cargarSeguimiento(fecha, sortState){
     const cont = document.getElementById('seguimiento');
@@ -1043,38 +1128,53 @@ function cargarSeguimiento(fecha, sortState){
     const state = (sortState && typeof sortState === 'object') ? sortState : {};
     const sortPrev = (typeof state.sortPrev === 'string') ? state.sortPrev : (window.__seguimientoSortPrev || '');
     const sortLast = (typeof state.sortLast === 'string') ? state.sortLast : (window.__seguimientoSortLast || '');
+    const sortAvance = (typeof state.sortAvance === 'string') ? state.sortAvance : (window.__seguimientoSortAvance || '');
+    const requestedOrder = Array.isArray(state.sortOrder) ? state.sortOrder : (window.__seguimientoSortOrder || []);
+    const directions = { prev: sortPrev, last: sortLast, avance: sortAvance };
+    const sortOrder = requestedOrder.filter(function(key, index){
+        return directions[key] && requestedOrder.indexOf(key) === index;
+    });
+    ['prev', 'last', 'avance'].forEach(function(key){
+        if (directions[key] && !sortOrder.includes(key)) sortOrder.push(key);
+    });
     window.__seguimientoSortPrev = sortPrev;
     window.__seguimientoSortLast = sortLast;
+    window.__seguimientoSortAvance = sortAvance;
+    window.__seguimientoSortOrder = sortOrder;
     let url = 'seguimiento_pedidos.php?fecha=' + encodeURIComponent(fecha || '');
     if (supervisor) url += '&supervisor=' + encodeURIComponent(supervisor);
     if (sortPrev) url += '&sort_prev=' + encodeURIComponent(sortPrev);
     if (sortLast) url += '&sort_last=' + encodeURIComponent(sortLast);
+    if (sortAvance) url += '&sort_avance=' + encodeURIComponent(sortAvance);
+    if (sortOrder.length) url += '&sort_order=' + encodeURIComponent(sortOrder.join(','));
     fetch(url)
         .then(r => r.text())
         .then(html => {
             cont.innerHTML = html;
+            iniciarFiltroVendedoresSeguimiento(cont);
+            actualizarIngresoSeguimiento();
             const sortPrevBtn = cont.querySelector('[data-sort-prev]');
             const sortBtn = cont.querySelector('[data-sort-last]');
             if (sortPrevBtn) {
                 sortPrevBtn.addEventListener('click', function(){
                     const fechaActual = document.getElementById('fecha_seguimiento') ? document.getElementById('fecha_seguimiento').value : '';
                     const nextSortPrev = this.getAttribute('data-sort-prev');
-                    cargarSeguimiento(fechaActual, {
-                        sortPrev: nextSortPrev === null ? 'asc' : nextSortPrev,
-                        sortLast: ''
-                    });
+                    cargarSeguimiento(fechaActual, siguienteOrdenSeguimiento('prev', nextSortPrev === null ? 'asc' : nextSortPrev));
                 });
             }
             if (sortBtn) {
                 sortBtn.addEventListener('click', function(){
                     const fechaActual = document.getElementById('fecha_seguimiento') ? document.getElementById('fecha_seguimiento').value : '';
                     const nextSort = this.getAttribute('data-sort-last');
-                    cargarSeguimiento(fechaActual, {
-                        sortPrev: '',
-                        sortLast: nextSort === null ? 'asc' : nextSort
-                    });
+                    cargarSeguimiento(fechaActual, siguienteOrdenSeguimiento('last', nextSort === null ? 'asc' : nextSort));
                 });
             }
+            cont.querySelectorAll('[data-sort-avance]').forEach(function(button) {
+                button.addEventListener('click', function() {
+                    const fechaActual = document.getElementById('fecha_seguimiento') ? document.getElementById('fecha_seguimiento').value : '';
+                    cargarSeguimiento(fechaActual, siguienteOrdenSeguimiento('avance', this.getAttribute('data-sort-avance') || ''));
+                });
+            });
         })
         .catch(() => { cont.innerHTML = '<p>Error al consultar seguimiento.</p>'; });
 }
@@ -1148,6 +1248,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 cargarSeguimiento(fecha);
             });
         }
+        const ingresoSeg = document.getElementById('mostrar_ingreso_seguimiento');
+        if (ingresoSeg) ingresoSeg.addEventListener('change', actualizarIngresoSeguimiento);
     }
     // Mostrar por defecto una pantalla de inicio (no cargar ningún módulo protegido)
     window.mostrarModulo('inicio');

@@ -7,8 +7,20 @@ $fecha = isset($_GET['fecha']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['fec
 $supervisor = isset($_GET['supervisor']) ? strtoupper(trim($_GET['supervisor'])) : '';
 $sortPrev = isset($_GET['sort_prev']) ? strtolower(trim((string)$_GET['sort_prev'])) : '';
 $sortLast = isset($_GET['sort_last']) ? strtolower(trim((string)$_GET['sort_last'])) : '';
+$sortAvance = isset($_GET['sort_avance']) ? strtolower(trim((string)$_GET['sort_avance'])) : '';
 if ($sortPrev !== 'asc' && $sortPrev !== 'desc') $sortPrev = '';
 if ($sortLast !== 'asc' && $sortLast !== 'desc') $sortLast = '';
+if ($sortAvance !== 'asc' && $sortAvance !== 'desc') $sortAvance = '';
+$sortDirections = ['avance' => $sortAvance, 'prev' => $sortPrev, 'last' => $sortLast];
+$sortOrder = [];
+foreach (explode(',', (string)($_GET['sort_order'] ?? '')) as $key) {
+    if (isset($sortDirections[$key]) && $sortDirections[$key] !== '' && !in_array($key, $sortOrder, true)) {
+        $sortOrder[] = $key;
+    }
+}
+foreach (['prev', 'last', 'avance'] as $key) {
+    if ($sortDirections[$key] !== '' && !in_array($key, $sortOrder, true)) $sortOrder[] = $key;
+}
 
 // Definición de rangos (exactamente como imagen):
 $rangos = [
@@ -231,33 +243,25 @@ foreach ($vendedores as $cod => $info) {
     ];
 }
 
-if ($sortPrev !== '' || $sortLast !== '') {
-    usort($filas, function($a, $b) use ($sortPrev, $sortLast) {
-        $compareHora = function($left, $right, $direction) {
-            if ($direction === '') return 0;
-            $leftNull = empty($left);
-            $rightNull = empty($right);
-            if ($leftNull && $rightNull) return 0;
-            if ($leftNull) return 1;
-            if ($rightNull) return -1;
-
-            $cmp = strcmp((string)$left, (string)$right);
-            if ($cmp === 0) return 0;
-            return ($direction === 'asc') ? $cmp : -$cmp;
-        };
-
-        $cmpPrev = $compareHora($a['l2'], $b['l2'], $sortPrev);
-        if ($cmpPrev !== 0) return $cmpPrev;
-
-        $cmpLast = $compareHora($a['l1'], $b['l1'], $sortLast);
-        if ($cmpLast !== 0) return $cmpLast;
-
-        $aNull = empty($a['l1']) && empty($a['l2']);
-        $bNull = empty($b['l1']) && empty($b['l2']);
-        if ($aNull && $bNull) return intval($a['cod']) <=> intval($b['cod']);
-        if ($aNull) return 1;
-        if ($bNull) return -1;
-
+if ($sortOrder) {
+    usort($filas, function($a, $b) use ($sortOrder, $sortDirections) {
+        foreach ($sortOrder as $key) {
+            $direction = $sortDirections[$key];
+            if ($key === 'avance') {
+                $cmp = (float)$a['avance'] <=> (float)$b['avance'];
+            } else {
+                $field = $key === 'prev' ? 'l2' : 'l1';
+                $left = $a[$field];
+                $right = $b[$field];
+                if (empty($left) || empty($right)) {
+                    if (empty($left) && empty($right)) continue;
+                    // Las horas faltantes siempre quedan al final.
+                    return empty($left) ? 1 : -1;
+                }
+                $cmp = strcmp((string)$left, (string)$right);
+            }
+            if ($cmp !== 0) return $direction === 'asc' ? $cmp : -$cmp;
+        }
         return intval($a['cod']) <=> intval($b['cod']);
     });
 }
@@ -268,32 +272,46 @@ $sortPrevTitle = ($sortPrev === 'asc') ? 'Ordenado de menor a mayor' : (($sortPr
 $nextSortLast = ($sortLast === 'asc') ? 'desc' : (($sortLast === 'desc') ? '' : 'asc');
 $sortArrow = ($sortLast === 'asc') ? '▲' : (($sortLast === 'desc') ? '▼' : '⇅');
 $sortTitle = ($sortLast === 'asc') ? 'Ordenado de menor a mayor' : (($sortLast === 'desc') ? 'Ordenado de mayor a menor' : 'Ordenar por último pedido');
+$nextSortAvance = ($sortAvance === 'asc') ? 'desc' : (($sortAvance === 'desc') ? '' : 'asc');
+$sortAvanceArrow = ($sortAvance === 'asc') ? '▲' : (($sortAvance === 'desc') ? '▼' : '⇅');
+$sortAvanceTitle = ($sortAvance === 'asc') ? 'Avance de menor a mayor' : (($sortAvance === 'desc') ? 'Avance de mayor a menor' : 'Ordenar por avance de cuota');
+$sortAvanceButton = '<button type="button" class="seg-sort-btn' . ($sortAvance !== '' ? ' is-active' : '') . '" data-sort-avance="' . htmlspecialchars($nextSortAvance, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortAvanceTitle, ENT_QUOTES, 'UTF-8') . '" aria-label="' . htmlspecialchars($sortAvanceTitle, ENT_QUOTES, 'UTF-8') . '">Avance cuota <span class="seg-sort-icon">' . htmlspecialchars($sortAvanceArrow, ENT_QUOTES, 'UTF-8') . '</span></button>';
+
+echo '<details class="seg-vendor-filter"><summary>Vendedores: todos</summary>';
+echo '<div class="seg-vendor-filter-panel">';
+echo '<div class="seg-vendor-filter-actions"><button type="button" data-seg-vendors-all>Todos</button><button type="button" data-seg-vendors-none>Ninguno</button></div>';
+echo '<div class="seg-vendor-filter-list">';
+foreach ($vendedores as $cod => $info) {
+    echo '<label><input type="checkbox" data-seg-vendor-choice value="' . htmlspecialchars((string)$cod, ENT_QUOTES, 'UTF-8') . '"> VD ' . htmlspecialchars((string)$cod, ENT_QUOTES, 'UTF-8') . '</label>';
+}
+echo '</div></div></details>';
+echo '<p class="seg-vendor-empty seg-vendor-hidden" data-seg-vendor-empty>No hay vendedores visibles con estos filtros.</p>';
 
 // Render de la tabla de seguimiento (desktop)
 echo '<table class="seg-desktop">';
-echo '<tr><th colspan="11" style="text-align:left; background:#e6f2ff; font-size:17px;">Seguimiento del ' . htmlspecialchars($fecha) . ($supervisor ? ' — Supervisor: ' . htmlspecialchars($supervisor) : '') . ' <button onclick="window.print()" style="float:right; background:#007bff; color:#fff; border:none; padding:6px 16px; border-radius:4px; cursor:pointer; font-size:15px;">Imprimir PDF</button></th></tr>';
+echo '<tr><th colspan="11" data-seg-table-title style="text-align:left; background:#e6f2ff; font-size:17px;">Seguimiento del ' . htmlspecialchars($fecha) . ($supervisor ? ' — Supervisor: ' . htmlspecialchars($supervisor) : '') . ' <button onclick="window.print()" style="float:right; background:#007bff; color:#fff; border:none; padding:6px 16px; border-radius:4px; cursor:pointer; font-size:15px;">Imprimir PDF</button></th></tr>';
 
 // Fila 1 de encabezados: Agrupación INGRESO
 echo '<tr>';
-echo '<th rowspan="2" style="text-align:center;">Vendedor</th>';
-echo '<th rowspan="2" style="text-align:center; min-width:170px;">Avance cuota</th>';
-echo '<th rowspan="2" style="text-align:center;">RANGO 1<br><small>7 - 9</small></th>';
-echo '<th rowspan="2" style="text-align:center;">RANGO 2<br><small>10 - 12</small></th>';
-echo '<th rowspan="2" style="text-align:center;">RANGO 3<br><small>13 - 15</small></th>';
-echo '<th rowspan="2" style="text-align:center;">RANGO 4<br><small>16 - 18</small></th>';
-echo '<th colspan="3" style="text-align:center; background:#f8fafc; color:#1e293b; font-weight:800; border-bottom: 2px solid #cbd5e1;">INGRESO</th>';
-echo '<th rowspan="2" style="text-align:center;"><button type="button" class="seg-sort-btn' . ($sortPrev !== '' ? ' is-active' : '') . '" data-sort-prev="' . htmlspecialchars($nextSortPrev, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortPrevTitle, ENT_QUOTES, 'UTF-8') . '">Penultimo pedido <span class="seg-sort-icon">' . htmlspecialchars($sortPrevArrow, ENT_QUOTES, 'UTF-8') . '</span></button></th>';
-echo '<th rowspan="2" style="text-align:center;"><button type="button" class="seg-sort-btn' . ($sortLast !== '' ? ' is-active' : '') . '" data-sort-last="' . htmlspecialchars($nextSortLast, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortTitle, ENT_QUOTES, 'UTF-8') . '">Ultimo pedido <span class="seg-sort-icon">' . htmlspecialchars($sortArrow, ENT_QUOTES, 'UTF-8') . '</span></button></th>';
+echo '<th rowspan="2" data-seg-rowspan style="text-align:center;">Vendedor</th>';
+echo '<th rowspan="2" data-seg-rowspan style="text-align:center; min-width:170px;">' . $sortAvanceButton . '</th>';
+echo '<th rowspan="2" data-seg-rowspan style="text-align:center;">RANGO 1<br><small>7 - 9</small></th>';
+echo '<th rowspan="2" data-seg-rowspan style="text-align:center;">RANGO 2<br><small>10 - 12</small></th>';
+echo '<th rowspan="2" data-seg-rowspan style="text-align:center;">RANGO 3<br><small>13 - 15</small></th>';
+echo '<th rowspan="2" data-seg-rowspan style="text-align:center;">RANGO 4<br><small>16 - 18</small></th>';
+echo '<th colspan="3" class="seg-ingreso" style="text-align:center; background:#f8fafc; color:#1e293b; font-weight:800; border-bottom: 2px solid #cbd5e1;">INGRESO</th>';
+echo '<th rowspan="2" data-seg-rowspan style="text-align:center;"><button type="button" class="seg-sort-btn' . ($sortPrev !== '' ? ' is-active' : '') . '" data-sort-prev="' . htmlspecialchars($nextSortPrev, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortPrevTitle, ENT_QUOTES, 'UTF-8') . '">Penultimo pedido <span class="seg-sort-icon">' . htmlspecialchars($sortPrevArrow, ENT_QUOTES, 'UTF-8') . '</span></button></th>';
+echo '<th rowspan="2" data-seg-rowspan style="text-align:center;"><button type="button" class="seg-sort-btn' . ($sortLast !== '' ? ' is-active' : '') . '" data-sort-last="' . htmlspecialchars($nextSortLast, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($sortTitle, ENT_QUOTES, 'UTF-8') . '">Ultimo pedido <span class="seg-sort-icon">' . htmlspecialchars($sortArrow, ENT_QUOTES, 'UTF-8') . '</span></button></th>';
 echo '</tr>';
 
 // Fila 2: Sub-cabeceras de INGRESO
-echo '<tr>';
+echo '<tr class="seg-ingreso">';
 echo '<th style="text-align:center;">1er pedido</th>';
 echo '<th style="text-align:center;">2do pedido</th>';
 echo '<th style="text-align:center;">Diferencia</th>';
 echo '</tr>';
 foreach ($filas as $f) {
-    echo '<tr>';
+    echo '<tr data-seg-vendor-row="' . htmlspecialchars($f['cod'], ENT_QUOTES, 'UTF-8') . '">';
     // Mostrar penúltimo (l2) y último (l1) según petición
     echo '<td style="text-align:center;">' . htmlspecialchars($f['cod']) . '</td>';
     echo '<td style="text-align:center;">' . renderAvanceSeguimiento((float)$f['avance']) . '</td>';
@@ -301,9 +319,9 @@ foreach ($filas as $f) {
     echo '<td style="text-align:center;">' . intval($f['r2']) . '</td>';
     echo '<td style="text-align:center;">' . intval($f['r3']) . '</td>';
     echo '<td style="text-align:center;">' . intval($f['r4']) . '</td>';
-    echo '<td style="text-align:center;">' . ($f['f1'] ? htmlspecialchars($f['f1']) : '—') . '</td>';
-    echo '<td style="text-align:center;">' . ($f['f2'] ? htmlspecialchars($f['f2']) : '—') . '</td>';
-    echo '<td style="text-align:center; ' . $f['diffStyle'] . '">' . ($f['diff'] ? htmlspecialchars($f['diff']) : '—') . '</td>';
+    echo '<td class="seg-ingreso" style="text-align:center;">' . ($f['f1'] ? htmlspecialchars($f['f1']) : '—') . '</td>';
+    echo '<td class="seg-ingreso" style="text-align:center;">' . ($f['f2'] ? htmlspecialchars($f['f2']) : '—') . '</td>';
+    echo '<td class="seg-ingreso" style="text-align:center; ' . $f['diffStyle'] . '">' . ($f['diff'] ? htmlspecialchars($f['diff']) : '—') . '</td>';
     echo '<td style="text-align:center;">' . ($f['l2'] ? htmlspecialchars($f['l2']) : '—') . '</td>';
     echo '<td style="text-align:center;">' . ($f['l1'] ? htmlspecialchars($f['l1']) : '—') . '</td>';
     echo '</tr>';
@@ -314,10 +332,11 @@ echo '</table>';
 echo '<div class="seg-mobile">';
 echo '<div class="seg-head">'
     . '<h3>Seguimiento del ' . htmlspecialchars($fecha) . ($supervisor ? ' — ' . htmlspecialchars($supervisor) : '') . '</h3>'
+    . $sortAvanceButton
     . '<button onclick="window.print()">Imprimir PDF</button>'
     . '</div>';
 foreach ($filas as $f) {
-    echo '<div class="seg-card">';
+    echo '<div class="seg-card" data-seg-vendor-row="' . htmlspecialchars($f['cod'], ENT_QUOTES, 'UTF-8') . '">';
     echo   '<div class="seg-vendor">Vendedor ' . htmlspecialchars($f['cod']) . '</div>';
     echo   '<div class="seg-progress-wrap">' . renderAvanceSeguimiento((float)$f['avance']) . '</div>';
     echo   '<div class="seg-badges">'
@@ -326,7 +345,7 @@ foreach ($filas as $f) {
             . '<span class="seg-badge r3">R3 (' . htmlspecialchars($rLabels[3]) . '): ' . intval($f['r3']) . '</span>'
             . '<span class="seg-badge r4">R4 (' . htmlspecialchars($rLabels[4]) . '): ' . intval($f['r4']) . '</span>'
         . '</div>';
-    echo   '<div class="seg-last" style="margin-bottom:6px;">'
+    echo   '<div class="seg-last seg-ingreso" style="margin-bottom:6px;">'
             . '<span>1er Ped: <span class="seg-time">' . ($f['f1'] ? htmlspecialchars($f['f1']) : '—') . '</span></span>'
             . '<span>2do Ped: <span class="seg-time">' . ($f['f2'] ? htmlspecialchars($f['f2']) : '—') . '</span></span>'
             . '<span>Gap: <span style="' . $f['diffStyle'] . '">' . ($f['diff'] ? htmlspecialchars($f['diff']) : '—') . '</span></span>'

@@ -1571,8 +1571,26 @@ button:hover {
    Seguimiento de Pedidos
    ======================== */
 .seg-mobile { display:none; }
-.seg-mobile .seg-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
-.seg-mobile .seg-head h3 { margin:0; font-size:16px; color:#333; }
+.seg-filter-help { margin: -8px 0 12px; font-size: 13px; color: #64748b; }
+.seg-ingreso-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+#seguimiento.seg-ingreso-oculto .seg-ingreso { display: none !important; }
+#seguimiento.seg-ingreso-oculto table.seg-desktop { min-width: 640px; }
+.seg-vendor-filter { position: relative; margin-bottom: 12px; max-width: 540px; }
+.seg-vendor-filter summary { width: fit-content; padding: 7px 12px; border: 1px solid #94a3b8; border-radius: 6px; cursor: pointer; font-weight: 700; }
+.seg-vendor-filter-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; width: min(520px, 90vw); max-height: 320px; overflow: auto; padding: 12px; background: #fff; color: #111827; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 10px 24px rgba(15, 23, 42, .2); }
+.seg-vendor-filter-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.seg-vendor-filter-actions button { padding: 5px 10px; }
+.seg-vendor-filter-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 7px 12px; }
+.seg-vendor-filter-list label { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+.seg-vendor-empty { padding: 10px 12px; border-radius: 6px; background: #f1f5f9; color: #334155; }
+.seg-vendor-hidden { display: none !important; }
+body.dark-theme #modulo-seguimiento .seg-filter-help { color: #94a3b8; }
+body.dark-theme #modulo-seguimiento .seg-vendor-filter summary { background: #172033; color: #f8fafc; border-color: #475569; }
+body.dark-theme #modulo-seguimiento .seg-vendor-filter-panel { background: #172033; color: #e5e7eb; border-color: #475569; box-shadow: 0 12px 28px rgba(0, 0, 0, .45); }
+body.dark-theme #modulo-seguimiento .seg-vendor-filter-list label { color: #e5e7eb; }
+body.dark-theme #modulo-seguimiento .seg-vendor-empty { background: #1e293b; color: #e5e7eb; }
+.seg-mobile .seg-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.seg-mobile .seg-head h3 { flex-basis:100%; margin:0; font-size:16px; color:#333; }
 .seg-mobile .seg-card { border:1px solid #e5e7eb; border-radius:8px; padding:10px; margin:10px 0; background:#fafafa; }
 .seg-mobile .seg-vendor { font-weight:800; font-size:16px; color:#111827; margin-bottom:6px; }
 .seg-sort-btn {
@@ -1600,6 +1618,7 @@ button:hover {
     font-size: 12px;
     line-height: 1;
 }
+.seg-mobile .seg-sort-btn { width: auto; }
 .seg-progress-wrap { margin: 4px 0 10px 0; }
 .seg-mobile .seg-badges { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 8px 0; }
 .seg-mobile .seg-badge { background:#eef2ff; color:#111827; border-radius:999px; padding:4px 10px; font-weight:700; font-size:13px; min-width:64px; text-align:center; }

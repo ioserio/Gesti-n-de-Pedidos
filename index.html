@@ -217,6 +217,19 @@
 
         <hr style="margin:24px 0;">
 
+        <h2>Subir Excel de Pedidos y Saldos</h2>
+        <p>Importa el Excel con columnas <code>Abreviacion</code>, <code>NumCp</code>, <code>CodigoCliente</code>, <code>Saldo</code> y <code>Fecha</code> a <code>pedidos_cobranza_excel</code>. La primera fila debe contener los 20 encabezados del formato. <code>Entrega</code> se carga como texto (<code>VERDADERO</code>/<code>FALSO</code>).</p>
+        <form action="procesar_pedidos_cobranza_excel.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
+            <input type="file" name="archivo_pedidos_cobranza" accept=".xlsx,.xls" required>
+            <label style="margin-left:14px; display:inline-flex; align-items:center; gap:6px;">
+                <input type="checkbox" name="reemplazar_fechas" value="1" checked>
+                Reemplazar registros de las fechas del archivo
+            </label>
+            <button type="submit" style="margin-left:14px;">Subir Pedidos y Saldos</button>
+        </form>
+
+        <hr style="margin:24px 0;">
+
         <h2>Subir Excel de Cubo de Ventas</h2>
         <p>Selecciona tu archivo <b>CUBO DE VENTAS - RESUMEN.xlsx</b> para cargarlo en la tabla <code>cubo_de_ventas_resumen</code>. El sistema detecta la fecha de los documentos del archivo y reemplaza los registros existentes de esas mismas fechas.</p>
         <form action="procesar_cubo_ventas.php" method="post" enctype="multipart/form-data" style="margin-top:10px;">
@@ -312,8 +325,13 @@
                 <option value="FRANCISCO">FRANCISCO</option>
                 <option value="OFICINA">OFICINA</option>
             </select>
+            <label class="seg-ingreso-toggle" for="mostrar_ingreso_seguimiento">
+                <input type="checkbox" id="mostrar_ingreso_seguimiento" checked>
+                Mostrar ingreso
+            </label>
             <button type="submit">Consultar</button>
         </form>
+        <!--<p class="seg-filter-help">Abre “Vendedores” sobre la tabla para elegir qué VD mostrar.</p>-->
         <div id="seguimiento"></div>
     </section>
     <section id="modulo-cobranzas" style="display:none;">
