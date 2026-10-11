@@ -4,8 +4,8 @@
 date_default_timezone_set('America/Lima');
 
 $dbHost = getenv('DB_HOST') ?: 'HOST-NAME';
-$dbUser = getenv('DB_USER') ?: 'NAME-USER-DB';
-$dbPass = getenv('DB_PASS') ?: 'PASSWORD-DB';
+$dbUser = getenv('DB_USER') ?: 'NAME-USER-DATABASE';
+$dbPass = getenv('DB_PASS') ?: 'PASSWORD-DATABASE';
 $dbName = getenv('DB_NAME') ?: 'NAME-DB';
 $dbPort = (int)(getenv('DB_PORT') ?: 3306);
 
