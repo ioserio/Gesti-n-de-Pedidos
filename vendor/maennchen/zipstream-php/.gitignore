@@ -3,6 +3,7 @@
 /coverage.clover.xml
 /docs
 .idea
+.conexion.php
 /.php-cs-fixer.cache
 /.phpdoc/cache
 /.phpunit.result.cache
@@ -10,3 +11,4 @@
 /.phpunit.cache
 /tools
 /vendor
+.env
